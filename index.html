@@ -83,6 +83,12 @@
           <label class="check-item" title="Repairs stray unescaped quotes inside quoted text (RFC 4180)">
             <input type="checkbox" id="chk-quotes" checked> Fix Broken Quotes
           </label>
+          <label class="check-item" title="Auto-repairs garbled characters (â€™, Ã©, etc.) from Windows-1252 / UTF-8 mismatches">
+            <input type="checkbox" id="chk-mojibake" checked> Fix Mojibake (â€™, Ã©)
+          </label>
+          <label class="check-item" title="Preserves numeric codes like 07030, 00142 so Excel doesn't truncate them">
+            <input type="checkbox" id="chk-zeros" checked> Preserve Leading Zeros
+          </label>
           <label class="check-item" title="Removes leading and trailing whitespace from each cell">
             <input type="checkbox" id="chk-whitespace" checked> Trim Whitespace
           </label>
@@ -138,6 +144,14 @@
             <span class="stat-label">Quotes Repaired</span>
           </div>
           <div class="stat-card">
+            <span class="stat-value text-blue" id="stat-mojibake">0</span>
+            <span class="stat-label">Mojibake Fixed</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value text-cyan" id="stat-zeros">0</span>
+            <span class="stat-label">Zeros Preserved</span>
+          </div>
+          <div class="stat-card">
             <span class="stat-value text-warning" id="stat-deduped">0</span>
             <span class="stat-label">Duplicates Stripped</span>
           </div>
@@ -153,9 +167,13 @@
 
         <!-- Export Toolbar -->
         <div class="export-bar">
-          <button id="btn-export-csv" class="btn btn-export">
+          <button id="btn-export-csv" class="btn btn-export" title="Standard RFC 4180 CSV export">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
             Clean CSV
+          </button>
+          <button id="btn-export-excel" class="btn btn-export btn-excel-accent" title="Export CSV with UTF-8 BOM byte-order mark for seamless Microsoft Excel opening">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Excel CSV (BOM)
           </button>
           <button id="btn-export-json" class="btn btn-export">JSON</button>
           <button id="btn-export-md" class="btn btn-export">Markdown</button>
@@ -169,6 +187,13 @@
       <!-- Preview Controls -->
       <div class="preview-controls">
         <input type="text" id="filter-input" class="search-input" placeholder="Search preview rows...">
+        <div class="diff-legend">
+          <span class="legend-title">Visual Diff:</span>
+          <span class="legend-pill pill-repaired" title="Cell had broken quotes repaired">● Quote Repaired</span>
+          <span class="legend-pill pill-mojibake" title="Cell had garbled encoding repaired">● Mojibake Fixed</span>
+          <span class="legend-pill pill-masked" title="Sensitive PII masked">● PII Masked</span>
+          <span class="legend-pill pill-zeros" title="Leading zero retained">● Zero Preserved</span>
+        </div>
         <div class="pagination-info" id="pagination-info">Showing rows 1 - 50 of 0</div>
       </div>
 

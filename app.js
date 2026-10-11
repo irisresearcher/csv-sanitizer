@@ -1,5 +1,6 @@
 /**
- * CSV Shield - Interactive Application Controller
+ * CSV Shield v2.0 - Interactive Application Controller
+ * Zero external dependencies. 100% Client-Side.
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -21,6 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Options
   const selectDelimiter = document.getElementById('select-delimiter');
   const chkQuotes = document.getElementById('chk-quotes');
+  const chkMojibake = document.getElementById('chk-mojibake');
+  const chkZeros = document.getElementById('chk-zeros');
   const chkWhitespace = document.getElementById('chk-whitespace');
   const chkDedupe = document.getElementById('chk-dedupe');
   const chkEmpty = document.getElementById('chk-empty');
@@ -34,6 +37,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const statInputRows = document.getElementById('stat-input-rows');
   const statOutputRows = document.getElementById('stat-output-rows');
   const statRepaired = document.getElementById('stat-repaired');
+  const statMojibake = document.getElementById('stat-mojibake');
+  const statZeros = document.getElementById('stat-zeros');
   const statDeduped = document.getElementById('stat-deduped');
   const statPii = document.getElementById('stat-pii');
   const statTime = document.getElementById('stat-time');
@@ -46,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Export Buttons
   const btnExportCsv = document.getElementById('btn-export-csv');
+  const btnExportExcel = document.getElementById('btn-export-excel');
   const btnExportJson = document.getElementById('btn-export-json');
   const btnExportMd = document.getElementById('btn-export-md');
   const btnExportSql = document.getElementById('btn-export-sql');
@@ -67,15 +73,15 @@ document.addEventListener('DOMContentLoaded', () => {
   let lastProcessedData = null;
   let activeFileName = 'sanitized_data';
 
-  // Sample Corrupted Data for 1-Click Demo
+  // Sample Corrupted Data with Quotes, Mojibake, Leading Zeros, Duplicates, and PII
   const SAMPLE_CORRUPTED_CSV = `id,customer_name,email,phone,notes,amount,transaction_date
-1,Alice Johnson,alice.j@enterprise.com,+1 (555) 234-5678,Standard quarterly subscription renewal,99.00,2026-01-15
-2,Bob "The Builder" Smith,bob.smith@construct.io,555-987-6543,"Ordered "heavy duty" industrial drill bits with expedited delivery",450.50,2026-01-16
-1,Alice Johnson,alice.j@enterprise.com,+1 (555) 234-5678,Standard quarterly subscription renewal,99.00,2026-01-15
-3,Charlie Davis,charlie.d@gmail.com,1-800-555-0199,"Requires urgent follow-up on invoice #892",120.00,2026-01-18
+0014,Alice Johnson,alice.j@enterprise.com,+1 (555) 234-5678,Standard quarterly subscription renewal,99.00,2026-01-15
+0029,Bob "The Builder" Smith,bob.smith@construct.io,555-987-6543,"Ordered "heavy duty" drill bits for CafÃ© job; itâ€™s expedited",450.50,2026-01-16
+0014,Alice Johnson,alice.j@enterprise.com,+1 (555) 234-5678,Standard quarterly subscription renewal,99.00,2026-01-15
+07030,Charlie Davis,charlie.d@gmail.com,1-800-555-0199,"Requires urgent follow-up on invoice #892 - ZIP code 07030",120.00,2026-01-18
 
-4,Diana Prince,diana@themyscira.gov,+1-555-321-7654,"Urgent shipment: "Golden Lasso" accessories - card 4532-8901-2345-6789 on file",1500.00,2026-01-20
- 5 , Evan Wright , evan@wright.org , (555) 888-2233 , "Consulting session - 2 hours" , 300.00 , 2026-01-22 `;
+0082,Diana Prince,diana@themyscira.gov,+1-555-321-7654,"Urgent shipment: "Golden Lasso" accessories â€” card 4532-8901-2345-6789 on file",1500.00,2026-01-20
+ 0095 , Evan Wright , evan@wright.org , (555) 888-2233 , "Consulting session â€“ 2 hours" , 300.00 , 2026-01-22 `;
 
   // Tab Switching
   tabFile.addEventListener('click', () => {
@@ -136,7 +142,6 @@ document.addEventListener('DOMContentLoaded', () => {
     activeFileName = 'corrupted_sample';
     pasteInput.value = SAMPLE_CORRUPTED_CSV;
     fileNameDisplay.textContent = 'Loaded: corrupted_sample.csv (7 rows)';
-    // Switch to paste view so user can immediately see what got loaded
     tabPaste.click();
   });
 
@@ -162,6 +167,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const options = {
       delimiter: selectDelimiter.value,
       fixQuotes: chkQuotes.checked,
+      fixMojibake: chkMojibake.checked,
+      preserveLeadingZeros: chkZeros.checked,
       trimWhitespace: chkWhitespace.checked,
       deduplicate: chkDedupe.checked,
       removeEmptyRows: chkEmpty.checked,
@@ -184,17 +191,17 @@ document.addEventListener('DOMContentLoaded', () => {
     statInputRows.textContent = result.stats.totalRowsInput;
     statOutputRows.textContent = result.rows.length;
     statRepaired.textContent = result.stats.repairedRows;
+    statMojibake.textContent = result.stats.mojibakeFixedCount || 0;
+    statZeros.textContent = result.stats.zerosPreservedCount || 0;
     statDeduped.textContent = result.stats.duplicatesRemoved;
     statPii.textContent = result.stats.piiMaskedCount;
     statTime.textContent = `${result.stats.durationMs} ms`;
 
     renderTable(result.headers, result.rows);
-
-    // Scroll to results smoothly
     resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // Render Table
+  // Render Table with Visual Diff Highlighting
   function renderTable(headers, rows, filterText = '') {
     tableHead.innerHTML = '';
     tableBody.innerHTML = '';
@@ -210,27 +217,45 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     tableHead.appendChild(trHead);
 
-    // Filter Rows
-    let filteredRows = rows;
+    // Filter Rows with original index tracking
+    let indexedRows = rows.map((r, idx) => ({ row: r, originalIndex: idx }));
     if (filterText.trim().length > 0) {
       const q = filterText.toLowerCase();
-      filteredRows = rows.filter(r => r.some(cell => String(cell).toLowerCase().includes(q)));
+      indexedRows = indexedRows.filter(item => item.row.some(cell => String(cell).toLowerCase().includes(q)));
     }
 
     const maxDisplay = 50;
-    const displayRows = filteredRows.slice(0, maxDisplay);
+    const displayItems = indexedRows.slice(0, maxDisplay);
+    const mods = (lastProcessedData && lastProcessedData.stats && lastProcessedData.stats.cellModifications) ? lastProcessedData.stats.cellModifications : {};
 
-    displayRows.forEach(row => {
+    displayItems.forEach(item => {
       const tr = document.createElement('tr');
-      row.forEach(cell => {
+      const rIdx = item.originalIndex;
+
+      item.row.forEach((cell, cIdx) => {
         const td = document.createElement('td');
         td.textContent = cell;
+
+        const modKey = `${rIdx}:${cIdx}`;
+        if (mods[modKey]) {
+          const mod = mods[modKey];
+          td.classList.add('cell-diff', `cell-diff-${mod.type}`);
+
+          let tip = '';
+          if (mod.type === 'repaired') tip = `Quote Repaired: "${mod.original}" → "${mod.fixed}"`;
+          else if (mod.type === 'mojibake') tip = `Mojibake Fixed: "${mod.original}" → "${mod.fixed}"`;
+          else if (mod.type === 'masked') tip = `PII Anonymized: "${mod.original}" → "${mod.fixed}"`;
+          else if (mod.type === 'zeros') tip = `Leading Zero Retained: "${mod.original}"`;
+
+          td.setAttribute('data-tooltip', tip);
+        }
+
         tr.appendChild(td);
       });
       tableBody.appendChild(tr);
     });
 
-    paginationInfo.textContent = `Showing ${Math.min(displayRows.length, filteredRows.length)} of ${filteredRows.length} rows (preview limited to 50)`;
+    paginationInfo.textContent = `Showing ${Math.min(displayItems.length, indexedRows.length)} of ${indexedRows.length} rows (preview limited to 50)`;
   }
 
   // Filter Input Listener
@@ -253,10 +278,30 @@ document.addEventListener('DOMContentLoaded', () => {
     URL.revokeObjectURL(url);
   }
 
+  // Standard CSV Export
   btnExportCsv.addEventListener('click', () => {
     if (!lastProcessedData) return;
-    const csv = CSVSanitizer.toCSV(lastProcessedData.headers, lastProcessedData.rows, lastProcessedData.stats.delimiter);
+    const csv = CSVSanitizer.toCSV(
+      lastProcessedData.headers,
+      lastProcessedData.rows,
+      lastProcessedData.stats.delimiter,
+      false,
+      chkZeros.checked
+    );
     triggerDownload(csv, `${activeFileName}_clean.csv`, 'text/csv;charset=utf-8;');
+  });
+
+  // Excel UTF-8 BOM CSV Export
+  btnExportExcel.addEventListener('click', () => {
+    if (!lastProcessedData) return;
+    const csv = CSVSanitizer.toCSV(
+      lastProcessedData.headers,
+      lastProcessedData.rows,
+      lastProcessedData.stats.delimiter,
+      true, // BOM included
+      chkZeros.checked
+    );
+    triggerDownload(csv, `${activeFileName}_excel_clean.csv`, 'text/csv;charset=utf-8;');
   });
 
   btnExportJson.addEventListener('click', () => {
@@ -279,7 +324,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnCopy.addEventListener('click', () => {
     if (!lastProcessedData) return;
-    const csv = CSVSanitizer.toCSV(lastProcessedData.headers, lastProcessedData.rows, lastProcessedData.stats.delimiter);
+    const csv = CSVSanitizer.toCSV(
+      lastProcessedData.headers,
+      lastProcessedData.rows,
+      lastProcessedData.stats.delimiter,
+      false,
+      chkZeros.checked
+    );
     navigator.clipboard.writeText(csv).then(() => {
       copyBtnText.textContent = 'Copied!';
       setTimeout(() => {
@@ -304,7 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
     proModal.style.display = 'none';
   });
 
-  // Close modals on clicking backdrop
+  // Close modals on background click
   window.addEventListener('click', (e) => {
     if (e.target === inspectorModal) inspectorModal.style.display = 'none';
     if (e.target === proModal) proModal.style.display = 'none';

@@ -16,36 +16,41 @@ Every day, thousands of professionals export CSV files from platforms like Shopi
 
 | Competitor | URL | Price | What They Do Well | Fatal Weakness & Why Users Leave |
 | :--- | :--- | :--- | :--- | :--- |
-| **OpenRefine** | [openrefine.org](https://openrefine.org) | Free (Open-Source) | Powerful data clustering, GREL expressions | Heavy local Java runtime install required, steep learning curve for non-programmers, unintuitive UI, crashes on system RAM limits. |
-| **SmoothSheet** | [smoothsheet.com](https://smoothsheet.com) | $9/month SaaS | Good Google Sheets integration | Performs data processing on remote servers; subscription fatigue for occasional users. |
-| **Basedash CSV Cleaner** | [basedash.com](https://www.basedash.com/csv-cleaner) | Free Lead Magnet | Clean modern interface | Superficial cleanup only (trims whitespace, basic dedupe); cannot fix broken quotes or mask PII. Built as lead magnet for $1,000/mo enterprise BI tool. |
-| **CSV Workbench** | [csvworkbench.com](https://csvworkbench.com) | Free web tool | Runs SQL queries in browser | Geared exclusively towards SQL engineers; completely inaccessible to standard business users. |
+| **OpenRefine** | [openrefine.org](https://openrefine.org) | Free (Open-Source) | Deep clustering, GREL expressions | Heavy local Java runtime install, complex steep learning curve, non-programmers find it intimidating. |
+| **SmoothSheet** | [smoothsheet.com](https://smoothsheet.com) | $9/month SaaS | Good Google Sheets integration | Server-side processing violates company NDA / GDPR policies; recurring subscription fee. |
+| **CleanMyExcel / Rowtidy** | [cleanmyexcel.io](https://cleanmyexcel.io) | Freemium ($8-$15) | Quick formatting | Cloud processing; limited repair heuristics for broken internal quotes. |
+| **Basedash CSV Cleaner** | [basedash.com](https://www.basedash.com/csv-cleaner) | Free Lead Magnet | Modern clean UI | Superficial whitespace trimming only; cannot fix broken quotes, mojibake, or mask PII. |
+| **CSV Workbench** | [csvworkbench.com](https://csvworkbench.com) | Free web tool | Runs SQL queries in browser | Geared exclusively towards SQL engineers; inaccessible to typical business users. |
 
 ### Our Unique Differentiator (The Moat)
-1. **100% In-Browser & Air-Gapped**: Runs entirely inside local browser memory using vanilla JavaScript and Web Workers. No server uploads. Includes a live Network Traffic Inspector proving zero bytes transmitted.
-2. **1-Click Heuristic Auto-Repair**: Automatically detects delimiters and doubles unescaped internal quotes per RFC 4180 without requiring the user to write code or regex.
-3. **Built-in PII Anonymizer**: Instant masking for emails, phone numbers, and credit cards before sharing data.
-4. **No Subscription Fatigue**: Free for standard usage; one-time $15 purchase for Pro power features.
+1. **100% In-Browser & Air-Gapped**: Runs entirely inside local browser memory with zero network requests (verified by built-in Network Inspector).
+2. **1-Click Heuristic Auto-Repair**: Fixes RFC 4180 internal quotes, uneven column alignment, and delimiter mismatches without code.
+3. **Mojibake & Encoding Auto-Fixer**: Resolves garbled characters (`â€™`, `Ã©`, `â€œ`) caused by Windows-1252 to UTF-8 corruption.
+4. **Visual Cell Diffing & Audit Trail**: Highlights exactly which cells were repaired or masked with before/after tooltips.
+5. **Excel-Safe UTF-8 BOM Export**: Exports with `\uFEFF` byte order mark so files open cleanly in Excel without mangled accents.
+6. **No Subscription Fatigue**: Lifetime access model ($15 Pro) vs monthly SaaS bleed.
 
 ---
 
-## 3. Demand Evidence & Citations
+## 3. Fresh Community Pain Points (Reddit r/excel, r/webdev & GitHub Analysis)
 
-- **Indie Hackers & Reddit Discussions**: Users actively request tools to bypass tedious manual CSV formatting:
-  - *"I spend 2 hours every month manually fixing broken quote rows in client exports because company policy bans online AI tools."*
-  - *"OpenRefine is too complicated just to clean up 500 rows of Shopify customer data."*
-- **Search Volume**: Strong organic search demand for "clean broken CSV", "CSV sanitizer", "fix corrupted CSV quotes online", and "client side CSV cleaner".
-- **Source Links**:
-  - [Basedash CSV Cleaner](https://www.basedash.com/csv-cleaner)
-  - [SmoothSheet CSV Tools](https://smoothsheet.com)
-  - [OpenRefine Documentation & Issues](https://openrefine.org)
+1. **The "Mojibake" Encoding Trap**:
+   - Files copied from websites or legacy CRM systems frequently mix Windows-1252 and UTF-8, turning apostrophes and accents into `â€™` or `Ã©`.
+   - Users currently resort to manual Notepad++ find-and-replace or Python scripts.
+2. **Invisible Broken Cells (Lack of Visual Feedback)**:
+   - When automated cleaners fix rows silently, users don't know *what* was modified and mistrust the output. Visual highlighting (green for repaired, amber for PII masked) is critical for trust.
+3. **Excel Leading Zero Stripping**:
+   - ZIP codes (`07030`) and employee/order IDs (`004921`) lose leading zeros when loaded into spreadsheets. Users demand an option to preserve them via Excel text formatting (`="07030"`).
+4. **Column-Level Control**:
+   - Users don't always want to mask *all* emails or delete all blank cells—they want to choose which columns to drop, rename, or anonymize.
 
 ---
 
-## 4. Evaluation Score: 42 / 50 (Idea Bank #2)
+## 4. Evaluation Score: 44 / 50 (Idea Bank #2 - Updated)
 
-- **Demand Evidence (9/10)**: Persistent, documented daily friction across e-commerce, accounting, and development.
-- **Competition Gap (8/10)**: Existing tools either upload user data to cloud servers or are too complex to install.
-- **Build Speed (9/10)**: Fast to build as a zero-dependency client-side PWA in vanilla JS/CSS.
-- **Willingness to Pay (8/10)**: High utility for professionals handling confidential business data.
-- **Marketing Ease (8/10)**: Strong viral hook on Reddit, Hacker News, and LinkedIn centered on "Zero Cloud Uploads".
+- **Demand Evidence (9/10)**: Persistent daily pain point across accountants, operations, and developers.
+- **Competition Gap (9/10)**: No single-click, zero-upload tool combines quote repair, mojibake fixing, and visual cell diffing in a clean web UI.
+- **Build Speed (9/10)**: Pure client-side JavaScript/HTML5/CSS without backend overhead.
+- **Willingness to Pay (8/10)**: One-time $15 pricing matches the sweet spot of self-employed freelancers and business analysts.
+- **Marketing Ease (9/10)**: Strong viral appeal on Reddit (`r/excel`, `r/SideProject`, `r/webdev`) and Hacker News through the "100% private, zero cloud upload" angle.
+

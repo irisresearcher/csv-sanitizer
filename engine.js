@@ -1,7 +1,17 @@
 /**
- * ClientSide CSV Sanitizer & Formatter Engine
+ * ClientSide CSV Sanitizer & Formatter Engine v2.0
  * Zero external dependencies. 100% Client-Side.
- * Compatible with both Browser (window/ESM) and Node.js environments.
+ * Compatible with both Browser (window/self) and Node.js environments.
+ * 
+ * Features:
+ * - RFC 4180 Heuristic Quote Auto-Repair
+ * - Delimiter Auto-Detection (comma, semicolon, tab, pipe)
+ * - Mojibake & Encoding Corruption Fixer (Windows-1252 to UTF-8)
+ * - Visual Cell Diffing & Change Tracking (before/after tooltips)
+ * - PII Masking (Email, Phone, Credit Card)
+ * - Leading Zero Preservation for Excel (="01234")
+ * - UTF-8 BOM Excel-Compatible Export
+ * - Markdown, JSON, and SQL Multi-Format Exporters
  */
 
 (function (root, factory) {
@@ -23,7 +33,6 @@
     for (const d of delimiters) {
       scores[d] = { counts: [], variance: 0, total: 0 };
       for (const line of lines) {
-        // Count delimiters not enclosed in standard quotes
         let count = 0;
         let inQuotes = false;
         for (let i = 0; i < line.length; i++) {
@@ -35,7 +44,6 @@
         scores[d].total += count;
       }
 
-      // Calculate consistency (mean and variance)
       const counts = scores[d].counts;
       const mean = scores[d].total / counts.length;
       if (mean === 0) {
@@ -46,13 +54,11 @@
       }
     }
 
-    // Pick delimiter with lowest variance and highest non-zero mean
     let bestDelimiter = ',';
     let bestScore = -Infinity;
 
     for (const d of delimiters) {
       if (scores[d].total > 0) {
-        // Lower variance is better; higher total count gives confidence
         const consistencyScore = (scores[d].total / lines.length) / (1 + scores[d].variance);
         if (consistencyScore > bestScore) {
           bestScore = consistencyScore;
@@ -62,6 +68,30 @@
     }
 
     return bestDelimiter;
+  }
+
+  // Mojibake and encoding corruption repair
+  const MOJIBAKE_REPLACEMENTS = [
+    [/â€™/g, "'"], [/â€˜/g, "'"], [/â€œ/g, '"'], [/â€\x9d/g, '"'], [/â€/g, '"'],
+    [/â€“/g, "-"], [/â€”/g, "—"], [/â€¦/g, "..."], [/Â /g, " "], [/Â·/g, "·"],
+    [/Ã©/g, "é"], [/Ã¨/g, "è"], [/Ã /g, "à"], [/Ã¡/g, "á"], [/Ã¢/g, "â"],
+    [/Ã£/g, "ã"], [/Ã¤/g, "ä"], [/Ã¥/g, "å"], [/Ã§/g, "ç"], [/Ã®/g, "î"],
+    [/Ã¯/g, "ï"], [/Ã±/g, "ñ"], [/Ã³/g, "ó"], [/Ã²/g, "ò"], [/Ã´/g, "ô"],
+    [/Ã¶/g, "ö"], [/Ãµ/g, "õ"], [/Ãº/g, "ú"], [/Ã¹/g, "ù"], [/Ã»/g, "û"],
+    [/Ã¼/g, "ü"], [/Ã½/g, "ý"], [/Ã¿/g, "ÿ"], [/Ã‰/g, "É"], [/Ãˆ/g, "È"],
+    [/Ã€/g, "À"], [/Ã/g, "Á"], [/Ã‘/g, "Ñ"], [/Ã“/g, "Ó"], [/Ã–/g, "Ö"],
+    [/Ãœ/g, "Ü"], [/â‚¬/g, "€"], [/â„¢/g, "™"], [/Â©/g, "©"], [/Â®/g, "®"],
+    [/Â°/g, "°"], [/Â±/g, "±"]
+  ];
+
+  function fixMojibake(text) {
+    if (typeof text !== 'string' || !text) return text;
+    let res = text;
+    for (let i = 0; i < MOJIBAKE_REPLACEMENTS.length; i++) {
+      const [pattern, rep] = MOJIBAKE_REPLACEMENTS[i];
+      res = res.replace(pattern, rep);
+    }
+    return res;
   }
 
   // Pre-process and repair unescaped quotes in a raw line or stream
@@ -87,20 +117,16 @@
             inQuotedField = true;
             repaired.push(c);
           } else {
-            // Stray quote in unquoted field -> escape as double quote
             repaired.push('""');
           }
         } else {
-          // Inside a quoted field
           if (atFieldBoundaryEnd) {
             inQuotedField = false;
             repaired.push(c);
           } else if (next === '"') {
-            // Already an escaped quote pair
             repaired.push('""');
             i++; // skip next quote
           } else {
-            // Unescaped inner quote -> double it to escape properly per RFC 4180
             repaired.push('""');
           }
         }
@@ -112,7 +138,6 @@
       }
     }
 
-    // If an unclosed quote remained at line end, close it
     if (inQuotedField) {
       repaired.push('"');
     }
@@ -127,13 +152,17 @@
     let currentCell = '';
     let inQuotes = false;
     let repairedLinesCount = 0;
+    const repairedRowIndices = new Set();
 
     let source = text;
     if (fixQuotes) {
       const rawLines = text.split(/\r?\n/);
-      const repairedLines = rawLines.map(line => {
+      const repairedLines = rawLines.map((line, idx) => {
         const rep = repairUnescapedQuotes(line, delimiter);
-        if (rep !== line) repairedLinesCount++;
+        if (rep !== line) {
+          repairedLinesCount++;
+          repairedRowIndices.add(idx);
+        }
         return rep;
       });
       source = repairedLines.join('\n');
@@ -169,7 +198,7 @@
       rows.push(currentRow);
     }
 
-    return { rows, repairedLinesCount };
+    return { rows, repairedLinesCount, repairedRowIndices };
   }
 
   // PII Masking Utilities
@@ -180,14 +209,19 @@
 
   function maskPhone(val) {
     if (typeof val !== 'string') return val;
-    // Matches formats: (555) 123-4567, 555-123-4567, +1-555-123-4567, 1-800-555-0199
     return val.replace(/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?(\d{4})\b/g, '(***) ***-$1');
   }
 
   function maskCreditCard(val) {
     if (typeof val !== 'string') return val;
-    // Matches 13-19 digit credit cards separated by dashes or spaces
     return val.replace(/\b(?:\d{4}[-\s]?){3}(\d{4})\b/g, '****-****-****-$1');
+  }
+
+  // Check if string is a numeric value with a meaningful leading zero (e.g. 07030, 004821)
+  function isLeadingZeroNumeric(val) {
+    if (typeof val !== 'string') return false;
+    const trimmed = val.trim();
+    return /^0\d+$/.test(trimmed) && trimmed.length > 1;
   }
 
   // Master Sanitization Routine
@@ -197,25 +231,40 @@
     const opts = {
       delimiter: options.delimiter || 'auto',
       fixQuotes: options.fixQuotes !== false,
+      fixMojibake: options.fixMojibake !== false,
       trimWhitespace: options.trimWhitespace !== false,
       deduplicate: options.deduplicate !== false,
       removeEmptyRows: options.removeEmptyRows !== false,
       normalizeColumns: options.normalizeColumns !== false,
+      preserveLeadingZeros: !!options.preserveLeadingZeros,
       maskEmail: !!options.maskEmail,
       maskPhone: !!options.maskPhone,
       maskCreditCard: !!options.maskCreditCard
     };
 
     const effectiveDelimiter = (opts.delimiter === 'auto') ? detectDelimiter(rawText) : opts.delimiter;
-    const { rows: rawRows, repairedLinesCount } = parseCSV(rawText, effectiveDelimiter, opts.fixQuotes);
+    
+    // Parse raw rows without quote repair to provide baseline for cell diffing
+    let baselineRows = [];
+    try {
+      const rawRes = parseCSV(rawText, effectiveDelimiter, false);
+      baselineRows = rawRes.rows;
+    } catch (_) {
+      baselineRows = [];
+    }
+
+    const { rows: rawRows, repairedLinesCount, repairedRowIndices } = parseCSV(rawText, effectiveDelimiter, opts.fixQuotes);
 
     let cleanRows = [];
     let emptyRowsRemoved = 0;
     let duplicatesRemoved = 0;
     let piiMaskedCount = 0;
+    let mojibakeFixedCount = 0;
+    let zerosPreservedCount = 0;
 
     // Remove empty rows
-    for (const row of rawRows) {
+    for (let i = 0; i < rawRows.length; i++) {
+      const row = rawRows[i];
       const isBlank = row.every(cell => !cell || cell.trim().length === 0);
       if (opts.removeEmptyRows && isBlank) {
         emptyRowsRemoved++;
@@ -235,63 +284,122 @@
           duplicatesRemoved: 0,
           emptyRowsRemoved,
           piiMaskedCount: 0,
+          mojibakeFixedCount: 0,
+          zerosPreservedCount: 0,
           delimiter: effectiveDelimiter,
-          durationMs: 0
+          durationMs: 0,
+          cellModifications: {}
         }
       };
     }
 
-    // Determine target column count based on header
     const headers = cleanRows[0].map(h => opts.trimWhitespace ? h.trim() : h);
     const targetCols = headers.length;
     const dataRows = cleanRows.slice(1);
 
     const processedData = [];
     const seenHashes = new Set();
+    const cellModifications = {}; // key: `${rowIndex}:${colIndex}` -> { type, original, fixed }
 
     for (let r = 0; r < dataRows.length; r++) {
       let row = dataRows[r];
+      const outputRowIdx = processedData.length; // 0-indexed data row index
 
-      // Trim whitespace
+      // 1. Trim whitespace
       if (opts.trimWhitespace) {
         row = row.map(cell => cell.trim());
       }
 
-      // Normalize column count
+      // 2. Normalize column count
       if (opts.normalizeColumns) {
         if (row.length < targetCols) {
           while (row.length < targetCols) row.push('');
         } else if (row.length > targetCols) {
-          // Extra columns condensed into last column or truncated
           const extra = row.slice(targetCols - 1).join(', ');
           row = row.slice(0, targetCols - 1);
           row.push(extra);
         }
       }
 
-      // PII Masking
-      if (opts.maskEmail || opts.maskPhone || opts.maskCreditCard) {
-        row = row.map(cell => {
-          let updated = cell;
-          if (opts.maskEmail) {
-            const masked = maskEmail(updated);
-            if (masked !== updated) { piiMaskedCount++; updated = masked; }
+      // 3. Process each cell for Mojibake, Leading Zeros, and PII
+      const updatedRow = [];
+      for (let c = 0; c < row.length; c++) {
+        let cellVal = row[c];
+        const initialCellVal = cellVal;
+        let modType = null;
+        let originalValue = cellVal;
+
+        // Check if row had quote repair
+        if (opts.fixQuotes && repairedRowIndices && repairedRowIndices.has(r + 1)) {
+          // If this cell contains quotes or had unescaped quotes
+          if (cellVal.includes('"')) {
+            modType = 'repaired';
           }
-          if (opts.maskPhone) {
-            const masked = maskPhone(updated);
-            if (masked !== updated) { piiMaskedCount++; updated = masked; }
+        }
+
+        // Mojibake Repair
+        if (opts.fixMojibake) {
+          const cleanMoji = fixMojibake(cellVal);
+          if (cleanMoji !== cellVal) {
+            mojibakeFixedCount++;
+            originalValue = cellVal;
+            cellVal = cleanMoji;
+            modType = 'mojibake';
           }
-          if (opts.maskCreditCard) {
-            const masked = maskCreditCard(updated);
-            if (masked !== updated) { piiMaskedCount++; updated = masked; }
+        }
+
+        // Leading Zero Preservation for Excel
+        if (opts.preserveLeadingZeros && isLeadingZeroNumeric(cellVal)) {
+          zerosPreservedCount++;
+          if (!modType) {
+            originalValue = cellVal;
+            modType = 'zeros';
           }
-          return updated;
-        });
+        }
+
+        // PII Masking
+        if (opts.maskEmail) {
+          const masked = maskEmail(cellVal);
+          if (masked !== cellVal) {
+            piiMaskedCount++;
+            originalValue = cellVal;
+            cellVal = masked;
+            modType = 'masked';
+          }
+        }
+        if (opts.maskPhone) {
+          const masked = maskPhone(cellVal);
+          if (masked !== cellVal) {
+            piiMaskedCount++;
+            originalValue = cellVal;
+            cellVal = masked;
+            modType = 'masked';
+          }
+        }
+        if (opts.maskCreditCard) {
+          const masked = maskCreditCard(cellVal);
+          if (masked !== cellVal) {
+            piiMaskedCount++;
+            originalValue = cellVal;
+            cellVal = masked;
+            modType = 'masked';
+          }
+        }
+
+        if (modType) {
+          cellModifications[`${outputRowIdx}:${c}`] = {
+            type: modType,
+            original: originalValue,
+            fixed: cellVal
+          };
+        }
+
+        updatedRow.push(cellVal);
       }
 
-      // Deduplication
+      // 4. Deduplication
       if (opts.deduplicate) {
-        const rowHash = JSON.stringify(row);
+        const rowHash = JSON.stringify(updatedRow);
         if (seenHashes.has(rowHash)) {
           duplicatesRemoved++;
           continue;
@@ -299,7 +407,7 @@
         seenHashes.add(rowHash);
       }
 
-      processedData.push(row);
+      processedData.push(updatedRow);
     }
 
     const endTime = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -315,17 +423,26 @@
         duplicatesRemoved,
         emptyRowsRemoved,
         piiMaskedCount,
+        mojibakeFixedCount,
+        zerosPreservedCount,
         delimiter: effectiveDelimiter,
-        durationMs
+        durationMs,
+        cellModifications
       }
     };
   }
 
   // Exporters
-  function toCSV(headers, rows, delimiter = ',') {
+  function toCSV(headers, rows, delimiter = ',', includeBOM = false, preserveLeadingZeros = false) {
     function escapeCell(val) {
       if (val === null || val === undefined) return '';
-      const str = String(val);
+      let str = String(val);
+
+      // If preserve leading zeros is active and cell is leading-zero numeric, format as Excel text formula
+      if (preserveLeadingZeros && isLeadingZeroNumeric(str)) {
+        return `="${str}"`;
+      }
+
       if (str.includes(delimiter) || str.includes('"') || str.includes('\n') || str.includes('\r')) {
         return '"' + str.replace(/"/g, '""') + '"';
       }
@@ -337,7 +454,8 @@
     for (const row of rows) {
       lines.push(row.map(escapeCell).join(delimiter));
     }
-    return lines.join('\r\n');
+    const body = lines.join('\r\n');
+    return includeBOM ? ('\uFEFF' + body) : body;
   }
 
   function toJSON(headers, rows, pretty = true) {
@@ -368,9 +486,7 @@
     const statements = rows.map(row => {
       const vals = row.map(val => {
         if (val === null || val === undefined || val === '') return 'NULL';
-        // Check if numeric
         if (!isNaN(val) && val.trim() !== '') return Number(val);
-        // String escaping
         const escaped = String(val).replace(/'/g, "''");
         return `'${escaped}'`;
       }).join(', ');
@@ -382,6 +498,7 @@
 
   return {
     detectDelimiter,
+    fixMojibake,
     repairUnescapedQuotes,
     parseCSV,
     process,

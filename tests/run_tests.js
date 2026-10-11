@@ -72,6 +72,28 @@ assert(mdOut.includes('| id | customer_name |') && mdOut.includes('| --- |'), 'E
 const sqlOut = CSVSanitizer.toSQL('customers', result.headers, result.rows);
 assert(sqlOut.includes('INSERT INTO customers') && sqlOut.includes('VALUES'), 'Exports valid SQL statements');
 
+// Test 5 (v2.0): Mojibake Repair
+const corruptedMojibake = 'id,product,desc\n1,CafÃ©,Itâ€™s Bobâ€œs tool';
+const mojiResult = CSVSanitizer.process(corruptedMojibake, { fixMojibake: true });
+assert(mojiResult.rows[0][1] === 'Café', `Repaired accent mojibake (got: ${mojiResult.rows[0][1]})`);
+assert(mojiResult.rows[0][2].includes("It's"), `Repaired apostrophe mojibake (got: ${mojiResult.rows[0][2]})`);
+assert(mojiResult.stats.mojibakeFixedCount >= 2, `Tracked mojibake repair count (${mojiResult.stats.mojibakeFixedCount})`);
+
+// Test 6 (v2.0): Excel UTF-8 BOM Export
+const bomCSV = CSVSanitizer.toCSV(['col1'], [['value']], ',', true);
+assert(bomCSV.charCodeAt(0) === 0xFEFF, 'Exports CSV with UTF-8 BOM mark');
+
+// Test 7 (v2.0): Leading Zero Preservation
+const zeroData = 'code,zip\n0014,07030';
+const zeroResult = CSVSanitizer.process(zeroData, { preserveLeadingZeros: true });
+assert(zeroResult.stats.zerosPreservedCount === 2, `Tracked leading zero tokens (${zeroResult.stats.zerosPreservedCount})`);
+const zeroCSV = CSVSanitizer.toCSV(zeroResult.headers, zeroResult.rows, ',', false, true);
+assert(zeroCSV.includes('="0014"') && zeroCSV.includes('="07030"'), 'Formats leading zeroes as Excel text formula');
+
+// Test 8 (v2.0): Cell Diffing Tracking
+assert(typeof result.stats.cellModifications === 'object', 'Outputs cellModifications map');
+assert(Object.keys(result.stats.cellModifications).length > 0, 'Cell modifications correctly tracked for visual diff');
+
 console.log(`\n==========================================`);
 console.log(`Test Summary: ${passed} Passed, ${failed} Failed`);
 console.log(`==========================================\n`);
@@ -79,3 +101,4 @@ console.log(`==========================================\n`);
 if (failed > 0) {
   process.exit(1);
 }
+

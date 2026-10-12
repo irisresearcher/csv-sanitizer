@@ -3,8 +3,107 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CSV Shield — Client-Side CSV Sanitizer & Privacy Formatter</title>
-  <meta name="description" content="100% in-browser, private, offline CSV repair, deduplication, and PII anonymizer. Zero server uploads.">
+  <title>CSV Shield — 100% Client-Side CSV Cleaner, Quote Fixer & PII Anonymizer</title>
+  <meta name="description" content="Free, 100% in-browser CSV sanitizer. Automatically fix broken unescaped quotes (RFC 4180), repair mismatched delimiters, fix encoding/mojibake, and anonymize PII with zero server uploads and zero privacy risk.">
+  <meta name="keywords" content="csv fixer, unescaped quotes csv, fix broken csv, rfc 4180 parser, clean csv online, client side csv cleaner, anonymize csv, csv pii mask, fix excel csv shift, mojibake fixer, offline csv tool">
+  <meta name="author" content="CSV Shield">
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+  <link rel="canonical" href="https://iriswick.github.io/csv-sanitizer/">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%236366f1'><path d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/></svg>">
+
+  <!-- Open Graph / Social Sharing -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://iriswick.github.io/csv-sanitizer/">
+  <meta property="og:title" content="CSV Shield — 100% Client-Side CSV Cleaner & Quote Fixer">
+  <meta property="og:description" content="Fix unescaped quotes, mismatched delimiters, and mask customer PII directly in your browser. Zero cloud uploads, zero privacy risk.">
+  <meta property="og:image" content="og-image.png">
+  <meta property="og:site_name" content="CSV Shield">
+
+  <!-- Twitter / X Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://iriswick.github.io/csv-sanitizer/">
+  <meta name="twitter:title" content="CSV Shield — 100% In-Browser CSV Sanitizer">
+  <meta name="twitter:description" content="Zero cloud uploads. Fix broken quotes, column alignment, and anonymize PII in seconds directly in your browser.">
+  <meta name="twitter:image" content="og-image.png">
+
+  <!-- Schema.org JSON-LD (Search Engines & AI Engines) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebApplication",
+        "@id": "https://iriswick.github.io/csv-sanitizer/#webapp",
+        "name": "CSV Shield",
+        "url": "https://iriswick.github.io/csv-sanitizer/",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "All (Web Browser PWA)",
+        "description": "100% in-browser, private, offline CSV repair, deduplication, and PII anonymizer with zero cloud uploads.",
+        "offers": [
+          {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD",
+            "name": "Free Web Tier"
+          },
+          {
+            "@type": "Offer",
+            "price": "15",
+            "priceCurrency": "USD",
+            "name": "Pro Lifetime License"
+          }
+        ],
+        "featureList": [
+          "RFC 4180 Unescaped Quote Auto-Repair",
+          "Mismatched Delimiter Normalization",
+          "Mojibake Character Encoding Resolution",
+          "Automated PII Masking & Anonymization",
+          "Zero-Cloud In-Browser Local Memory Execution",
+          "Excel-Safe UTF-8 BOM CSV Export",
+          "Export to JSON, Markdown, and SQL"
+        ]
+      },
+      {
+        "@type": "FAQPage",
+        "@id": "https://iriswick.github.io/csv-sanitizer/#faq",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "How does CSV Shield fix broken quotes without uploading files?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "CSV Shield executes entirely within your browser's local JavaScript engine and Web Workers. It analyzes raw text lines using RFC 4180 heuristic regex matching to identify internal quotes in cells without ever transmitting data over the Internet."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Why does Microsoft Excel shift my CSV data into wrong rows?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "When a CSV field contains an unescaped double quote (e.g., in product descriptions or addresses), standard spreadsheet parsers interpret the quote as the beginning of a multiline cell. This causes the remainder of the row to spill into subsequent columns or lines. CSV Shield automatically detects and escapes these internal quotes."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "Is CSV Shield safe for confidential and GDPR-protected data?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Yes. Because CSV Shield does not use any cloud servers, backends, or third-party telemetry, your data never leaves your computer. It fully complies with GDPR, HIPAA, and strict corporate non-disclosure agreements."
+            }
+          },
+          {
+            "@type": "Question",
+            "name": "How can I fix mangled accents and weird characters (mojibake) in my CSV?",
+            "acceptedAnswer": {
+              "@type": "Answer",
+              "text": "Mangled characters like â€™ or Ã© occur when Windows-1252 files are opened as UTF-8. CSV Shield contains a built-in character encoding healer that normalizes these common corruption sequences back to clean UTF-8 with an Excel-safe BOM."
+            }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -203,6 +302,53 @@
           <thead id="table-head"></thead>
           <tbody id="table-body"></tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- SEO & Knowledge Base Section (Search Engines & AI Crawler Directives) -->
+    <section class="card seo-knowledge-section">
+      <div class="seo-header">
+        <h2>Why CSV Shield? 100% Client-Side In-Browser Repair</h2>
+        <p class="text-muted">Enterprise-grade data cleaning without cloud compliance violations or subscription fatigue.</p>
+      </div>
+      <div class="seo-grid">
+        <div class="seo-card">
+          <h3>🛡️ Zero Server Uploads</h3>
+          <p>Unlike cloud tools that send your confidential customer spreadsheets to remote servers, CSV Shield processes every byte locally inside your browser's V8 engine. Fully compliant with GDPR, HIPAA, and corporate NDAs.</p>
+        </div>
+        <div class="seo-card">
+          <h3>⚡ RFC 4180 Quote Auto-Repair</h3>
+          <p>Product descriptions with internal unescaped quotes break standard spreadsheet parsers. CSV Shield heuristically repairs quote boundaries so rows never spill into wrong columns.</p>
+        </div>
+        <div class="seo-card">
+          <h3>🔤 Mojibake & Encoding Healer</h3>
+          <p>Fixes garbled characters (like â€™ or Ã©) caused by Windows-1252 to UTF-8 transcoding errors and exports clean UTF-8 with an Excel-safe Byte Order Mark (BOM).</p>
+        </div>
+        <div class="seo-card">
+          <h3>🔒 1-Click PII Masking</h3>
+          <p>Anonymize sensitive customer emails, phone numbers, and payment details in seconds before sharing datasets with outsourced contractors or importing into AI models.</p>
+        </div>
+      </div>
+
+      <!-- FAQ Section -->
+      <div class="faq-accordion">
+        <h3>Frequently Asked Questions</h3>
+        <details class="faq-item">
+          <summary>How does CSV Shield fix broken quotes without uploading my data?</summary>
+          <p>CSV Shield executes entirely within your browser's local JavaScript engine and Web Workers. It analyzes raw text lines using RFC 4180 heuristic regex matching to identify internal quotes in cells without ever transmitting data over the Internet.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Why does Microsoft Excel shift my CSV data into wrong rows?</summary>
+          <p>When a CSV field contains an unescaped double quote, standard spreadsheet parsers interpret it as the start of an open multiline block. This shifts the rest of the row into subsequent cells. CSV Shield identifies and escapes internal quotes automatically.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Is CSV Shield safe for confidential and GDPR-protected data?</summary>
+          <p>Yes. CSV Shield has zero cloud backends, zero analytics beacons, and zero telemetry. You can disconnect your Wi-Fi or turn on Airplane Mode and the app continues working completely offline.</p>
+        </details>
+        <details class="faq-item">
+          <summary>How do I resolve mangled accents and characters (mojibake)?</summary>
+          <p>Mangled characters occur when legacy systems export Windows-1252 files opened as UTF-8. CSV Shield contains a multi-byte heuristic table that automatically repairs common corrupt sequences and prepends an Excel-compatible UTF-8 BOM.</p>
+        </details>
       </div>
     </section>
   </main>

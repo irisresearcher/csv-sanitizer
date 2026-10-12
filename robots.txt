@@ -20,4 +20,4 @@ Allow: /
 User-agent: anthropic-ai
 Allow: /
 
-Sitemap: https://iriswick.github.io/csv-sanitizer/sitemap.xml
+Sitemap: https://irisresearcher.github.io/csv-sanitizer/sitemap.xml

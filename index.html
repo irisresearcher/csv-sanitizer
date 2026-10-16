@@ -147,6 +147,7 @@
             <option value="shopify">🛍️ Sample: Shopify Catalog (Quotes)</option>
             <option value="salesforce">💼 Sample: Salesforce CRM (PII)</option>
             <option value="finance">💶 Sample: Finance Ledger (Mojibake)</option>
+            <option value="stress">🚀 Sample: 100-Row Stress Benchmark</option>
           </select>
           <button id="btn-load-sample" class="btn btn-ghost btn-sm">Load Preset</button>
           <button id="btn-clear" class="btn btn-ghost btn-sm">Clear</button>
@@ -308,6 +309,24 @@
           <thead id="table-head"></thead>
           <tbody id="table-body"></tbody>
         </table>
+      </div>
+
+      <!-- Pagination Toolbar -->
+      <div class="pagination-toolbar" style="display: flex; align-items: center; justify-content: space-between; margin-top: 1rem; flex-wrap: wrap; gap: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; color: #94a3b8;">
+          <span>Rows per page:</span>
+          <select id="select-page-size" class="select-input select-sm" style="background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(99, 102, 241, 0.4); color: #c7d2fe; border-radius: 6px; padding: 4px 8px; font-size: 0.8rem; cursor: pointer;">
+            <option value="25">25</option>
+            <option value="50" selected>50</option>
+            <option value="100">100</option>
+            <option value="all">All</option>
+          </select>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <button id="btn-page-prev" class="btn btn-ghost btn-sm" disabled>‹ Previous</button>
+          <span id="page-indicator" style="font-size: 0.85rem; font-weight: 600; color: #cbd5e1; min-width: 90px; text-align: center;">Page 1 of 1</span>
+          <button id="btn-page-next" class="btn btn-ghost btn-sm" disabled>Next ›</button>
+        </div>
       </div>
     </section>
 

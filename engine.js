@@ -571,10 +571,23 @@
   }
 
   function toJSON(headers, rows, pretty = true) {
+    const uniqueHeaders = [];
+    const counts = {};
+    (headers || []).forEach((h, idx) => {
+      const base = (h && String(h).trim()) ? String(h).trim() : `col_${idx + 1}`;
+      if (counts[base] === undefined) {
+        counts[base] = 0;
+        uniqueHeaders.push(base);
+      } else {
+        counts[base]++;
+        uniqueHeaders.push(`${base}_${counts[base]}`);
+      }
+    });
+
     const list = rows.map(row => {
       const obj = {};
-      headers.forEach((h, idx) => {
-        obj[h || `col_${idx + 1}`] = row[idx] !== undefined ? row[idx] : null;
+      uniqueHeaders.forEach((h, idx) => {
+        obj[h] = row[idx] !== undefined ? row[idx] : null;
       });
       return obj;
     });
@@ -593,12 +606,19 @@
 
   function toSQL(tableName, headers, rows) {
     const safeTable = (tableName || 'sanitized_data').replace(/[^a-zA-Z0-9_]/g, '_');
-    const cols = headers.map(h => '`' + (h || 'col').replace(/`/g, '') + '`').join(', ');
+    const cols = (headers || []).map(h => '`' + String(h || 'col').replace(/`/g, '') + '`').join(', ');
     
     const statements = rows.map(row => {
       const vals = row.map(val => {
         if (val === null || val === undefined || val === '') return 'NULL';
-        if (!isNaN(val) && val.trim() !== '') return Number(val);
+        const strVal = String(val).trim();
+        // Keep as string if leading-zero numeric (e.g. 008492) or large numeric string (>15 digits)
+        if (isLeadingZeroNumeric(strVal) || strVal.length > 15) {
+          return `'${strVal.replace(/'/g, "''")}'`;
+        }
+        if (!isNaN(strVal) && /^-?\d+(\.\d+)?$/.test(strVal)) {
+          return Number(strVal);
+        }
         const escaped = String(val).replace(/'/g, "''");
         return `'${escaped}'`;
       }).join(', ');

@@ -49,6 +49,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const tableBody = document.getElementById('table-body');
   const filterInput = document.getElementById('filter-input');
   const paginationInfo = document.getElementById('pagination-info');
+  const selectPageSize = document.getElementById('select-page-size');
+  const btnPagePrev = document.getElementById('btn-page-prev');
+  const btnPageNext = document.getElementById('btn-page-next');
+  const pageIndicator = document.getElementById('page-indicator');
 
   // Export Buttons
   const btnExportCsv = document.getElementById('btn-export-csv');
@@ -73,6 +77,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeTab = 'file';
   let lastProcessedData = null;
   let activeFileName = 'sanitized_data';
+  let currentPage = 1;
+  let pageSize = 50;
 
   // Sample Corrupted Data with Quotes, Mojibake, Leading Zeros, Duplicates, and PII
   const SAMPLE_CORRUPTED_CSV = `id,customer_name,email,phone,notes,amount,transaction_date
@@ -176,6 +182,24 @@ organic-tea-selection,"Morning "Sunrise" Herbal Tea Variety Pack (60 Bags)","<p>
       chosenText = SAMPLE_FINANCE_CSV;
       label = 'financial_audit.csv (5 ledger rows with European mojibake)';
       activeFileName = 'financial_audit';
+    } else if (preset === 'stress') {
+      label = 'stress_test_1000_rows.csv (1,000+ real-world stress rows)';
+      activeFileName = 'stress_benchmark';
+      fetch('./test_data/stress_test_1000_rows.csv')
+        .then(r => r.ok ? r.text() : Promise.reject())
+        .then(txt => {
+          rawText = txt;
+          pasteInput.value = txt;
+          fileNameDisplay.textContent = 'Loaded: ' + label;
+          tabPaste.click();
+        })
+        .catch(() => {
+          rawText = SAMPLE_CORRUPTED_CSV;
+          pasteInput.value = SAMPLE_CORRUPTED_CSV;
+          fileNameDisplay.textContent = 'Loaded: corrupted_sample.csv (7 rows)';
+          tabPaste.click();
+        });
+      return;
     } else {
       activeFileName = 'corrupted_sample';
     }
@@ -238,16 +262,23 @@ organic-tea-selection,"Morning "Sunrise" Herbal Tea Variety Pack (60 Bags)","<p>
     statPii.textContent = result.stats.piiMaskedCount;
     statTime.textContent = `${result.stats.durationMs} ms`;
 
+    currentPage = 1;
     renderTable(result.headers, result.rows);
     resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // Render Table with Visual Diff Highlighting
+  // Render Table with Visual Diff Highlighting and Dynamic Pagination
   function renderTable(headers, rows, filterText = '') {
     tableHead.innerHTML = '';
     tableBody.innerHTML = '';
 
-    if (!headers || headers.length === 0) return;
+    if (!headers || headers.length === 0) {
+      if (paginationInfo) paginationInfo.textContent = 'Showing 0 of 0 rows';
+      if (pageIndicator) pageIndicator.textContent = 'Page 1 of 1';
+      if (btnPagePrev) btnPagePrev.disabled = true;
+      if (btnPageNext) btnPageNext.disabled = true;
+      return;
+    }
 
     // Header Row
     const trHead = document.createElement('tr');
@@ -265,8 +296,16 @@ organic-tea-selection,"Morning "Sunrise" Herbal Tea Variety Pack (60 Bags)","<p>
       indexedRows = indexedRows.filter(item => item.row.some(cell => String(cell).toLowerCase().includes(q)));
     }
 
-    const maxDisplay = 50;
-    const displayItems = indexedRows.slice(0, maxDisplay);
+    const totalFiltered = indexedRows.length;
+    const limit = (pageSize === 'all' || pageSize === Infinity) ? Math.max(1, totalFiltered) : Math.max(1, parseInt(pageSize, 10) || 50);
+    const totalPages = Math.max(1, Math.ceil(totalFiltered / limit));
+
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIdx = (currentPage - 1) * limit;
+    const endIdx = (pageSize === 'all' || pageSize === Infinity) ? totalFiltered : Math.min(startIdx + limit, totalFiltered);
+    const displayItems = indexedRows.slice(startIdx, endIdx);
     const mods = (lastProcessedData && lastProcessedData.stats && lastProcessedData.stats.cellModifications) ? lastProcessedData.stats.cellModifications : {};
 
     displayItems.forEach(item => {
@@ -296,15 +335,53 @@ organic-tea-selection,"Morning "Sunrise" Herbal Tea Variety Pack (60 Bags)","<p>
       tableBody.appendChild(tr);
     });
 
-    paginationInfo.textContent = `Showing ${Math.min(displayItems.length, indexedRows.length)} of ${indexedRows.length} rows (preview limited to 50)`;
+    if (totalFiltered === 0) {
+      if (paginationInfo) paginationInfo.textContent = 'Showing 0 of 0 rows';
+    } else {
+      if (paginationInfo) paginationInfo.textContent = `Showing rows ${startIdx + 1} - ${endIdx} of ${totalFiltered}${totalFiltered !== rows.length ? ` (filtered from ${rows.length})` : ''}`;
+    }
+
+    if (pageIndicator) pageIndicator.textContent = `Page ${currentPage} of ${totalPages}`;
+    if (btnPagePrev) btnPagePrev.disabled = (currentPage <= 1);
+    if (btnPageNext) btnPageNext.disabled = (currentPage >= totalPages);
   }
 
   // Filter Input Listener
   filterInput.addEventListener('input', (e) => {
+    currentPage = 1;
     if (lastProcessedData) {
       renderTable(lastProcessedData.headers, lastProcessedData.rows, e.target.value);
     }
   });
+
+  // Pagination Event Listeners
+  if (btnPagePrev) {
+    btnPagePrev.addEventListener('click', () => {
+      if (currentPage > 1 && lastProcessedData) {
+        currentPage--;
+        renderTable(lastProcessedData.headers, lastProcessedData.rows, filterInput.value);
+      }
+    });
+  }
+
+  if (btnPageNext) {
+    btnPageNext.addEventListener('click', () => {
+      if (lastProcessedData) {
+        currentPage++;
+        renderTable(lastProcessedData.headers, lastProcessedData.rows, filterInput.value);
+      }
+    });
+  }
+
+  if (selectPageSize) {
+    selectPageSize.addEventListener('change', (e) => {
+      pageSize = e.target.value === 'all' ? 'all' : parseInt(e.target.value, 10);
+      currentPage = 1;
+      if (lastProcessedData) {
+        renderTable(lastProcessedData.headers, lastProcessedData.rows, filterInput.value);
+      }
+    });
+  }
 
   // Exporters Helper
   function triggerDownload(content, filename, mimeType) {

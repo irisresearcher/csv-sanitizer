@@ -71,6 +71,14 @@ assert(mdOut.includes('| id | customer_name |') && mdOut.includes('| --- |'), 'E
 
 const sqlOut = CSVSanitizer.toSQL('customers', result.headers, result.rows);
 assert(sqlOut.includes('INSERT INTO customers') && sqlOut.includes('VALUES'), 'Exports valid SQL statements');
+assert(sqlOut.includes("'0014'") || sqlOut.includes("'07030'"), 'SQL Exporter retains leading zeros as quoted strings');
+
+// Test 4b: Duplicate headers in JSON & Pipe escaping in Markdown
+const dupJSON = JSON.parse(CSVSanitizer.toJSON(['date', 'amount', 'date'], [['2026-01-01', '100', '2026-01-02']]));
+assert(dupJSON[0].date === '2026-01-01' && dupJSON[0].date_1 === '2026-01-02', 'JSON Exporter resolves duplicate headers without data loss');
+
+const pipeMD = CSVSanitizer.toMarkdown(['Col1', 'Col2'], [['A | B', 'Normal']]);
+assert(pipeMD.includes('A \\| B'), 'Markdown Exporter escapes literal pipes in cell contents');
 
 // Test 5 (v2.0): Mojibake Repair
 const corruptedMojibake = 'id,product,desc\n1,CafÃ©,Itâ€™s Bobâ€œs tool';

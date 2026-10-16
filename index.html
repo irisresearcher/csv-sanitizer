@@ -141,8 +141,14 @@
           <button id="tab-file" class="tab-btn active">File Upload / Drop</button>
           <button id="tab-paste" class="tab-btn">Paste Text</button>
         </div>
-        <div class="sample-actions">
-          <button id="btn-load-sample" class="btn btn-ghost btn-sm">Load Corrupted Sample Data</button>
+        <div class="sample-actions" style="display: flex; align-items: center; gap: 0.5rem;">
+          <select id="select-sample-preset" class="select-input select-sm" style="background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(99, 102, 241, 0.4); color: #c7d2fe; border-radius: 8px; padding: 5px 8px; font-size: 0.75rem; cursor: pointer;">
+            <option value="corrupted">⚡ Sample: General Corrupted</option>
+            <option value="shopify">🛍️ Sample: Shopify Catalog (Quotes)</option>
+            <option value="salesforce">💼 Sample: Salesforce CRM (PII)</option>
+            <option value="finance">💶 Sample: Finance Ledger (Mojibake)</option>
+          </select>
+          <button id="btn-load-sample" class="btn btn-ghost btn-sm">Load Preset</button>
           <button id="btn-clear" class="btn btn-ghost btn-sm">Clear</button>
         </div>
       </div>
@@ -349,6 +355,49 @@
           <summary>How do I resolve mangled accents and characters (mojibake)?</summary>
           <p>Mangled characters occur when legacy systems export Windows-1252 files opened as UTF-8. CSV Shield contains a multi-byte heuristic table that automatically repairs common corrupt sequences and prepends an Excel-compatible UTF-8 BOM.</p>
         </details>
+      </div>
+    </section>
+
+    <!-- Specialized Use Cases & Programmatic Landing Pages Grid -->
+    <section class="card seo-use-cases-section" style="margin-top: 2rem;">
+      <div class="section-title-wrap">
+        <h2>Specialized CSV Repair Solutions & Guides</h2>
+        <p class="section-subtitle">Dedicated 100% in-browser offline tools tailored for specific industry and platform export formats.</p>
+      </div>
+      <div class="use-cases-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 1.25rem;">
+        <a href="fix-shopify-csv-quotes.html" class="use-case-card" style="padding: 1.25rem; border-radius: 12px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(99, 102, 241, 0.25); text-decoration: none; color: inherit; display: block; transition: all 0.2s ease;">
+          <span style="font-size: 0.75rem; font-weight: 700; color: #818cf8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.25rem;">E-Commerce</span>
+          <strong style="display: block; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem;">Shopify Product CSV Fixer</strong>
+          <p style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4; margin: 0;">Fix 'Illegal quoting' errors and column shifts caused by inch quotes (24") and HTML descriptions.</p>
+        </a>
+        <a href="offline-gdpr-csv-sanitizer.html" class="use-case-card" style="padding: 1.25rem; border-radius: 12px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(99, 102, 241, 0.25); text-decoration: none; color: inherit; display: block; transition: all 0.2s ease;">
+          <span style="font-size: 0.75rem; font-weight: 700; color: #34d399; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.25rem;">Enterprise Compliance</span>
+          <strong style="display: block; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem;">Offline GDPR & HIPAA Sanitizer</strong>
+          <p style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4; margin: 0;">100% in-browser air-gapped processing designed to pass corporate DLP and audit standards.</p>
+        </a>
+        <a href="fix-unescaped-quotes-rfc4180.html" class="use-case-card" style="padding: 1.25rem; border-radius: 12px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(99, 102, 241, 0.25); text-decoration: none; color: inherit; display: block; transition: all 0.2s ease;">
+          <span style="font-size: 0.75rem; font-weight: 700; color: #f472b6; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.25rem;">Data Engineering</span>
+          <strong style="display: block; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem;">RFC 4180 Quote Healer</strong>
+          <p style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4; margin: 0;">Escapes rogue quotes for Postgres, Python pandas, BigQuery, and Snowflake loaders.</p>
+        </a>
+        <a href="salesforce-csv-loader-quote-fix.html" class="use-case-card" style="padding: 1.25rem; border-radius: 12px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(99, 102, 241, 0.25); text-decoration: none; color: inherit; display: block; transition: all 0.2s ease;">
+          <span style="font-size: 0.75rem; font-weight: 700; color: #38bdf8; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.25rem;">CRM Migrations</span>
+          <strong style="display: block; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem;">Salesforce Data Loader Healer</strong>
+          <p style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4; margin: 0;">Prevents failed batch upserts, unclosed EOF quotes, and delimiter errors in Salesforce Bulk API.</p>
+        </a>
+        <a href="offline-pii-masker-csv.html" class="use-case-card" style="padding: 1.25rem; border-radius: 12px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(99, 102, 241, 0.25); text-decoration: none; color: inherit; display: block; transition: all 0.2s ease;">
+          <span style="font-size: 0.75rem; font-weight: 700; color: #fbbf24; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.25rem;">Data Privacy</span>
+          <strong style="display: block; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem;">Offline PII Anonymizer</strong>
+          <p style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4; margin: 0;">Mask customer emails, phones, SSNs, and credit cards locally before sharing with contractors or LLMs.</p>
+        </a>
+        <a href="fix-excel-mojibake-utf8.html" class="use-case-card" style="padding: 1.25rem; border-radius: 12px; background: rgba(30, 41, 59, 0.7); border: 1px solid rgba(99, 102, 241, 0.25); text-decoration: none; color: inherit; display: block; transition: all 0.2s ease;">
+          <span style="font-size: 0.75rem; font-weight: 700; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.05em; display: block; margin-bottom: 0.25rem;">Character Encoding</span>
+          <strong style="display: block; font-size: 1rem; color: #f8fafc; margin-bottom: 0.5rem;">Excel Mojibake & BOM Repair</strong>
+          <p style="font-size: 0.8rem; color: #94a3b8; line-height: 1.4; margin: 0;">Repairs garbled accents (Ã©, â€™) and adds UTF-8 BOM so spreadsheets open natively in Excel.</p>
+        </a>
+      </div>
+      <div style="text-align: center; margin-top: 1.5rem;">
+        <a href="seo-hub.html" style="font-size: 0.85rem; font-weight: 600; color: #818cf8; text-decoration: underline;">View All CSV Repair Guides & Tools in Resource Hub →</a>
       </div>
     </section>
   </main>

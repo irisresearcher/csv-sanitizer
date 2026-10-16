@@ -94,6 +94,53 @@ assert(zeroCSV.includes('="0014"') && zeroCSV.includes('="07030"'), 'Formats lea
 assert(typeof result.stats.cellModifications === 'object', 'Outputs cellModifications map');
 assert(Object.keys(result.stats.cellModifications).length > 0, 'Cell modifications correctly tracked for visual diff');
 
+// Test 9: Real-World Shopify Products Catalog Benchmark
+const shopifyPath = path.join(__dirname, '../test_data/shopify_products_corrupted.csv');
+if (fs.existsSync(shopifyPath)) {
+  const shopifyRaw = fs.readFileSync(shopifyPath, 'utf8');
+  const shopifyRes = CSVSanitizer.process(shopifyRaw, {
+    fixQuotes: true,
+    preserveLeadingZeros: true,
+    fixMojibake: true
+  });
+  assert(shopifyRes.headers.length === 14, `Shopify: headers count matches 14 (got ${shopifyRes.headers.length})`);
+  assert(shopifyRes.rows.length === 5, `Shopify: exactly 5 product records parsed (got ${shopifyRes.rows.length})`);
+  assert(shopifyRes.stats.zerosPreservedCount >= 4, `Shopify: SKU leading zeros tracked (${shopifyRes.stats.zerosPreservedCount})`);
+}
+
+// Test 10: Real-World Salesforce CRM Leads Benchmark
+const sfPath = path.join(__dirname, '../test_data/salesforce_crm_corrupted.csv');
+if (fs.existsSync(sfPath)) {
+  const sfRaw = fs.readFileSync(sfPath, 'utf8');
+  const sfRes = CSVSanitizer.process(sfRaw, {
+    fixQuotes: true,
+    maskEmail: true,
+    maskPhone: true,
+    maskCreditCard: true,
+    fixMojibake: true
+  });
+  assert(sfRes.headers.length === 10, `Salesforce: headers count matches 10 (got ${sfRes.headers.length})`);
+  assert(sfRes.rows.length === 5, `Salesforce: exactly 5 CRM leads parsed (got ${sfRes.rows.length})`);
+  const sfString = JSON.stringify(sfRes.rows);
+  assert(sfString.includes('****-****-****-'), 'Salesforce: Credit card token sanitized');
+  assert(sfString.includes('***@'), 'Salesforce: Lead emails masked');
+}
+
+// Test 11: Real-World Financial Audit Mojibake Benchmark
+const finPath = path.join(__dirname, '../test_data/financial_audit_mojibake.csv');
+if (fs.existsSync(finPath)) {
+  const finRaw = fs.readFileSync(finPath, 'utf8');
+  const finRes = CSVSanitizer.process(finRaw, {
+    fixQuotes: true,
+    fixMojibake: true,
+    preserveLeadingZeros: true
+  });
+  assert(finRes.rows.length === 5, `Finance: exactly 5 ledger rows parsed (got ${finRes.rows.length})`);
+  const finString = JSON.stringify(finRes.rows);
+  assert(finString.includes('Café du Monde') && finString.includes('Müller & Schmidt') && finString.includes('Société Générale') && finString.includes('José Silva'), 'Finance: All European mojibake names healed to Unicode');
+  assert(finRes.stats.zerosPreservedCount >= 5, `Finance: Bank account leading zeros preserved (${finRes.stats.zerosPreservedCount})`);
+}
+
 console.log(`\n==========================================`);
 console.log(`Test Summary: ${passed} Passed, ${failed} Failed`);
 console.log(`==========================================\n`);
@@ -101,4 +148,3 @@ console.log(`==========================================\n`);
 if (failed > 0) {
   process.exit(1);
 }
-

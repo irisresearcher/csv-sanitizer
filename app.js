@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const fileNameDisplay = document.getElementById('file-name-display');
   const pasteInput = document.getElementById('paste-input');
 
+  const selectSamplePreset = document.getElementById('select-sample-preset');
   const btnLoadSample = document.getElementById('btn-load-sample');
   const btnClear = document.getElementById('btn-clear');
   const btnSanitize = document.getElementById('btn-sanitize');
@@ -83,6 +84,27 @@ document.addEventListener('DOMContentLoaded', () => {
 0082,Diana Prince,diana@themyscira.gov,+1-555-321-7654,"Urgent shipment: "Golden Lasso" accessories â€” card 4532-8901-2345-6789 on file",1500.00,2026-01-20
  0095 , Evan Wright , evan@wright.org , (555) 888-2233 , "Consulting session â€“ 2 hours" , 300.00 , 2026-01-22 `;
 
+  const SAMPLE_SHOPIFY_CSV = `Handle,Title,Body (HTML),Vendor,Type,Tags,Published,Option1 Name,Option1 Value,Variant SKU,Variant Grams,Variant Inventory Qty,Variant Price,Variant Compare At Price
+gaming-monitor-24,24" Ultra-Fast 144Hz Gaming Monitor,"<p>Featuring a 24" Fast-IPS display with 1ms response time and "Zero-Lag" synchronization.</p>",ApexDisplays,Monitors,"Electronics, Gaming",true,Size,24-inch,008492,4500,35,299.99,349.99
+ergonomic-desk-chair,Ergonomic "Executive" Mesh Chair,"<p>Designed for all-day comfort. Features "AirFlow" mesh and 3D adjustable armrests.</p>",ErgoPro,Chairs,"Office, Furniture",true,Color,Matte Black,001048,15000,12,199.50,249.00
+artisan-coffee-maker,12-Cup "Barista Reserve" Drip Coffee Maker,"<p>Brew rich coffee with our patented "Thermal-Lock" carafe and 24-hr timer.</p>",CaféKitchen,Appliances,"Kitchen, Coffee",true,Finish,Brushed Stainless,070392,3200,50,89.95,119.95
+heavy-duty-drill-bits,Titanium 1/2" & 1/4" Hex Shank Drill Bit Set,"<p>Includes 29 pieces with "Split-Point" tips for drilling through stainless steel.</p>",CraftPro,Tools,"Hardware, DIY",true,Set,29-Piece,000492,1800,120,45.00,59.99
+organic-tea-selection,"Morning "Sunrise" Herbal Tea Variety Pack (60 Bags)","<p>100% USDA Organic herbs with notes of Chamomile & Hibiscus.</p>",HerbHaven,Groceries,"Organic, Beverage",true,Count,60 Bags,005820,400,200,18.50,22.00`;
+
+  const SAMPLE_SALESFORCE_CSV = `Lead_ID,First_Name,Last_Name,Company,Email,Phone,Mailing_Address,Annual_Revenue,Lead_Status,Internal_Notes
+00Q5g000001,Marcus,Aurelius,"Stoic Logistics, Inc.",marcus@stoiclogistics.com,+1 (415) 555-0143,"100 Market St, Suite 400, San Francisco, CA 94105",2500000,Qualified - Working,"CEO requested urgent POC: "Enterprise Fleet Automation" by end of Q1; billing card 4111-2222-3333-4444 on file"
+00Q5g000002,Helena,"Troy" Vance,"Spartan Defense & Aerospace",helena.vance@spartandefense.org,+1-202-555-0188,"750 Pennsylvania Ave NW, Washington, DC 20006",18500000,Contacted,"Discussing multi-year DoD compliance contract. "Strict" offline data residency required."
+00Q5g000003,Jean-Luc,Picard,"Starlight Exploration Ltd",j.picard@starlight.eu,+33 1 42 68 55 00,"12 Rue de la Paix, 75002 Paris, France",4200000,New - Unassigned,"Exported with European accents: Résumé & audit dossier attached for review."
+00Q5g000004,Amara,Kowalski,"Apex FinTech Labs",amara.k@apexfintech.io,(212) 555-0199,"350 5th Ave, Floor 58, New York, NY 10118",9500000,Negotiation,"Met at Finovate 2026. Needs "White-Glove" migration from legacy Oracle DB before April."
+00Q5g000005,Devon,O'Connor,"Emerald BioScience",devon@emeraldbio.ie,+353 1 496 0000,"Grand Canal Dock, Dublin 2, Ireland",6100000,Qualified - Working,"Irish GDPR compliance officer flagged cloud spreadsheets; requested in-browser sanitizer tool."`;
+
+  const SAMPLE_FINANCE_CSV = `Account_No,Entity_Name,Tax_ID,Currency,Amount,Transaction_Type,Description,Auditor_Remarks
+00010482,CafÃ© du Monde SAS,FR928471092,EUR,14520.00,Credit,"Q4 franchise royalty payment â€” verified by CFO","Reconciled against BNP Paribas statement â€“ clean"
+00029410,MÃ¼ller & Schmidt GmbH,DE812398711,EUR,8940.50,Debit,"Machinery maintenance invoice #49281: "Precision CNC" components","Requires original VAT invoice from DÃ¼sseldorf office"
+00030582,SociÃ©tÃ© GÃ©nÃ©rale Logistics,FR102938475,EUR,32500.00,Credit,"Cross-border freight haulage across â‚¬ zone","Approved by audit partner on 2026-01-14"
+00041920,Barclays International UK,GB992817264,GBP,18250.75,Wire,"Consulting fee for â€œProject Horizonâ€  strategy","Wire reference: 9481-2819-4820-1928"
+00059281,JosÃ© Silva & Filhos Lda,PT501928374,EUR,6720.00,Debit,"Raw material purchase from Porto factory","Original dispatch note signed by JosÃ© Silva"`;
+
   // Tab Switching
   tabFile.addEventListener('click', () => {
     activeTab = 'file';
@@ -136,12 +158,31 @@ document.addEventListener('DOMContentLoaded', () => {
     reader.readAsText(file);
   }
 
-  // Load Sample Data
+  // Load Sample Data based on selected preset
   btnLoadSample.addEventListener('click', () => {
-    rawText = SAMPLE_CORRUPTED_CSV;
-    activeFileName = 'corrupted_sample';
-    pasteInput.value = SAMPLE_CORRUPTED_CSV;
-    fileNameDisplay.textContent = 'Loaded: corrupted_sample.csv (7 rows)';
+    const preset = selectSamplePreset ? selectSamplePreset.value : 'corrupted';
+    let chosenText = SAMPLE_CORRUPTED_CSV;
+    let label = 'corrupted_sample.csv (7 rows)';
+
+    if (preset === 'shopify') {
+      chosenText = SAMPLE_SHOPIFY_CSV;
+      label = 'shopify_products.csv (5 products with inch quotes & HTML)';
+      activeFileName = 'shopify_catalog';
+    } else if (preset === 'salesforce') {
+      chosenText = SAMPLE_SALESFORCE_CSV;
+      label = 'salesforce_leads.csv (5 CRM leads with PII & notes)';
+      activeFileName = 'salesforce_leads';
+    } else if (preset === 'finance') {
+      chosenText = SAMPLE_FINANCE_CSV;
+      label = 'financial_audit.csv (5 ledger rows with European mojibake)';
+      activeFileName = 'financial_audit';
+    } else {
+      activeFileName = 'corrupted_sample';
+    }
+
+    rawText = chosenText;
+    pasteInput.value = chosenText;
+    fileNameDisplay.textContent = 'Loaded: ' + label;
     tabPaste.click();
   });
 

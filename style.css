@@ -488,6 +488,16 @@ body {
   border: 1px solid rgba(6, 182, 212, 0.3);
 }
 
+.pill-date {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.text-emerald {
+  color: #10b981;
+}
+
 /* Cell Diff Highlights */
 .cell-diff {
   position: relative;
@@ -516,6 +526,57 @@ body {
   background-color: rgba(6, 182, 212, 0.12) !important;
   color: #67e8f9 !important;
   border-left: 3px solid #06b6d4 !important;
+}
+
+.cell-diff-date {
+  background-color: rgba(16, 185, 129, 0.12) !important;
+  color: #6ee7b7 !important;
+  border-left: 3px solid #10b981 !important;
+}
+
+/* Interactive Column Header Controls */
+.col-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.header-title-text {
+  cursor: pointer;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  border-radius: 3px;
+  padding: 0.1rem 0.25rem;
+  transition: background-color 0.15s ease;
+}
+
+.header-title-text:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  text-decoration: underline dotted #94a3b8;
+}
+
+.btn-drop-col {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  opacity: 0.6;
+  transition: all 0.15s ease;
+}
+
+.btn-drop-col:hover {
+  opacity: 1;
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
 }
 
 .cell-diff::after {

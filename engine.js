@@ -331,6 +331,115 @@
     return /^0\d+$/.test(trimmed) && trimmed.length > 1;
   }
 
+  // Standardize various date formats into clean ISO 8601 (YYYY-MM-DD or YYYY-MM-DD HH:mm:ss)
+  function standardizeDate(val) {
+    if (typeof val !== 'string') return val;
+    const trimmed = val.trim();
+    if (trimmed.length < 6 || trimmed.length > 35) return val;
+
+    // 1. Matches YYYY/MM/DD or YYYY.MM.DD or YYYY-MM-DD
+    const isoMatch = /^(\d{4})[\/\.\-](\d{1,2})[\/\.\-](\d{1,2})(.*)$/.exec(trimmed);
+    if (isoMatch) {
+      const y = isoMatch[1];
+      const m = isoMatch[2].padStart(2, '0');
+      const d = isoMatch[3].padStart(2, '0');
+      const rest = isoMatch[4] ? isoMatch[4].trim() : '';
+      const mNum = parseInt(m, 10);
+      const dNum = parseInt(d, 10);
+      if (mNum >= 1 && mNum <= 12 && dNum >= 1 && dNum <= 31) {
+        return rest ? `${y}-${m}-${d} ${rest}` : `${y}-${m}-${d}`;
+      }
+    }
+
+    // 2. Matches MM/DD/YYYY, DD/MM/YYYY, MM-DD-YYYY, DD-MM-YYYY
+    const slashMatch = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(.*)$/.exec(trimmed);
+    if (slashMatch) {
+      const p1 = parseInt(slashMatch[1], 10);
+      const p2 = parseInt(slashMatch[2], 10);
+      const y = slashMatch[3];
+      const rest = slashMatch[4] ? slashMatch[4].trim() : '';
+
+      let m, d;
+      if (p1 > 12 && p2 <= 12) {
+        // Definitely DD/MM/YYYY
+        d = String(p1).padStart(2, '0');
+        m = String(p2).padStart(2, '0');
+      } else if (p2 > 12 && p1 <= 12) {
+        // Definitely MM/DD/YYYY
+        m = String(p1).padStart(2, '0');
+        d = String(p2).padStart(2, '0');
+      } else if (p1 >= 1 && p1 <= 12 && p2 >= 1 && p2 <= 31) {
+        // Default assumption for ambiguous is MM/DD/YYYY (or standard ISO)
+        m = String(p1).padStart(2, '0');
+        d = String(p2).padStart(2, '0');
+      } else {
+        return val;
+      }
+
+      return rest ? `${y}-${m}-${d} ${rest}` : `${y}-${m}-${d}`;
+    }
+
+    // 3. Named month formats (e.g., "15 Jan 2026", "Jan 15, 2026", "15 January 2026")
+    const months = {
+      jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+      jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+    };
+
+    const namedMatch1 = /^(\d{1,2})\s+([A-Za-z]{3,9}),?\s+(\d{4})(.*)$/.exec(trimmed);
+    if (namedMatch1) {
+      const d = namedMatch1[1].padStart(2, '0');
+      const mKey = namedMatch1[2].slice(0, 3).toLowerCase();
+      const y = namedMatch1[3];
+      const rest = namedMatch1[4] ? namedMatch1[4].trim() : '';
+      if (months[mKey]) {
+        return rest ? `${y}-${months[mKey]}-${d} ${rest}` : `${y}-${months[mKey]}-${d}`;
+      }
+    }
+
+    const namedMatch2 = /^([A-Za-z]{3,9})\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})(.*)$/.exec(trimmed);
+    if (namedMatch2) {
+      const mKey = namedMatch2[1].slice(0, 3).toLowerCase();
+      const d = namedMatch2[2].padStart(2, '0');
+      const y = namedMatch2[3];
+      const rest = namedMatch2[4] ? namedMatch2[4].trim() : '';
+      if (months[mKey]) {
+        return rest ? `${y}-${months[mKey]}-${d} ${rest}` : `${y}-${months[mKey]}-${d}`;
+      }
+    }
+
+    return val;
+  }
+
+  // Column Manipulation Utilities
+  function dropColumn(headers, rows, colIdx, cellModifications = {}) {
+    if (!headers || colIdx < 0 || colIdx >= headers.length) {
+      return { headers: headers || [], rows: rows || [], cellModifications: cellModifications || {} };
+    }
+    const newHeaders = headers.filter((_, i) => i !== colIdx);
+    const newRows = (rows || []).map(r => r.filter((_, i) => i !== colIdx));
+    const newMods = {};
+    if (cellModifications) {
+      for (const [key, val] of Object.entries(cellModifications)) {
+        const [r, c] = key.split(':').map(Number);
+        if (c < colIdx) {
+          newMods[`${r}:${c}`] = val;
+        } else if (c > colIdx) {
+          newMods[`${r}:${c - 1}`] = val;
+        }
+      }
+    }
+    return { headers: newHeaders, rows: newRows, cellModifications: newMods };
+  }
+
+  function renameColumn(headers, colIdx, newName) {
+    if (!headers) return [];
+    const copy = [...headers];
+    if (colIdx >= 0 && colIdx < copy.length && typeof newName === 'string' && newName.trim().length > 0) {
+      copy[colIdx] = newName.trim();
+    }
+    return copy;
+  }
+
   // Master Sanitization Routine
   function process(rawText, options = {}) {
     const startTime = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -349,6 +458,7 @@
       removeEmptyRows: options.removeEmptyRows !== false,
       normalizeColumns: options.normalizeColumns !== false,
       preserveLeadingZeros: !!options.preserveLeadingZeros,
+      standardizeDates: !!options.standardizeDates,
       maskEmail: !!options.maskEmail,
       maskPhone: !!options.maskPhone,
       maskCreditCard: !!options.maskCreditCard
@@ -373,6 +483,7 @@
     let piiMaskedCount = 0;
     let mojibakeFixedCount = 0;
     let zerosPreservedCount = 0;
+    let datesStandardizedCount = 0;
 
     // Remove empty rows
     for (let i = 0; i < rawRows.length; i++) {
@@ -469,6 +580,17 @@
           }
         }
 
+        // Date Standardization (ISO 8601 YYYY-MM-DD)
+        if (opts.standardizeDates) {
+          const cleanDate = standardizeDate(cellVal);
+          if (cleanDate !== cellVal) {
+            datesStandardizedCount++;
+            originalValue = cellVal;
+            cellVal = cleanDate;
+            modType = 'date';
+          }
+        }
+
         // PII Masking
         if (opts.maskEmail) {
           const masked = maskEmail(cellVal);
@@ -537,6 +659,7 @@
         piiMaskedCount,
         mojibakeFixedCount,
         zerosPreservedCount,
+        datesStandardizedCount,
         delimiter: effectiveDelimiter,
         durationMs,
         cellModifications
@@ -632,6 +755,9 @@
     detectDelimiter,
     fixMojibake,
     repairUnescapedQuotes,
+    standardizeDate,
+    dropColumn,
+    renameColumn,
     parseCSV,
     process,
     toCSV,

@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const chkQuotes = document.getElementById('chk-quotes');
   const chkMojibake = document.getElementById('chk-mojibake');
   const chkZeros = document.getElementById('chk-zeros');
+  const chkDates = document.getElementById('chk-dates');
   const chkWhitespace = document.getElementById('chk-whitespace');
   const chkDedupe = document.getElementById('chk-dedupe');
   const chkEmpty = document.getElementById('chk-empty');
@@ -40,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const statRepaired = document.getElementById('stat-repaired');
   const statMojibake = document.getElementById('stat-mojibake');
   const statZeros = document.getElementById('stat-zeros');
+  const statDates = document.getElementById('stat-dates');
   const statDeduped = document.getElementById('stat-deduped');
   const statPii = document.getElementById('stat-pii');
   const statTime = document.getElementById('stat-time');
@@ -234,6 +236,7 @@ organic-tea-selection,"Morning "Sunrise" Herbal Tea Variety Pack (60 Bags)","<p>
       fixQuotes: chkQuotes.checked,
       fixMojibake: chkMojibake.checked,
       preserveLeadingZeros: chkZeros.checked,
+      standardizeDates: chkDates ? chkDates.checked : true,
       trimWhitespace: chkWhitespace.checked,
       deduplicate: chkDedupe.checked,
       removeEmptyRows: chkEmpty.checked,
@@ -258,6 +261,7 @@ organic-tea-selection,"Morning "Sunrise" Herbal Tea Variety Pack (60 Bags)","<p>
     statRepaired.textContent = result.stats.repairedRows;
     statMojibake.textContent = result.stats.mojibakeFixedCount || 0;
     statZeros.textContent = result.stats.zerosPreservedCount || 0;
+    if (statDates) statDates.textContent = result.stats.datesStandardizedCount || 0;
     statDeduped.textContent = result.stats.duplicatesRemoved;
     statPii.textContent = result.stats.piiMaskedCount;
     statTime.textContent = `${result.stats.durationMs} ms`;
@@ -267,7 +271,7 @@ organic-tea-selection,"Morning "Sunrise" Herbal Tea Variety Pack (60 Bags)","<p>
     resultsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  // Render Table with Visual Diff Highlighting and Dynamic Pagination
+  // Render Table with Visual Diff Highlighting, Column Controls, and Dynamic Pagination
   function renderTable(headers, rows, filterText = '') {
     tableHead.innerHTML = '';
     tableBody.innerHTML = '';
@@ -280,11 +284,53 @@ organic-tea-selection,"Morning "Sunrise" Herbal Tea Variety Pack (60 Bags)","<p>
       return;
     }
 
-    // Header Row
+    // Header Row with Interactive Rename & Drop Column Controls
     const trHead = document.createElement('tr');
-    headers.forEach(h => {
+    headers.forEach((h, cIdx) => {
       const th = document.createElement('th');
-      th.textContent = h;
+      th.className = 'col-header';
+
+      const inner = document.createElement('div');
+      inner.className = 'col-header-inner';
+
+      const titleSpan = document.createElement('span');
+      titleSpan.className = 'header-title-text';
+      titleSpan.textContent = h;
+      titleSpan.title = 'Click to rename this column';
+      titleSpan.addEventListener('click', () => {
+        const newName = prompt(`Rename column "${h}":`, h);
+        if (newName !== null && newName.trim().length > 0 && newName.trim() !== h) {
+          lastProcessedData.headers = CSVSanitizer.renameColumn(lastProcessedData.headers, cIdx, newName.trim());
+          renderTable(lastProcessedData.headers, lastProcessedData.rows, filterInput.value);
+        }
+      });
+
+      const dropBtn = document.createElement('button');
+      dropBtn.className = 'btn-drop-col';
+      dropBtn.innerHTML = '&times;';
+      dropBtn.title = `Drop column "${h}"`;
+      dropBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (confirm(`Are you sure you want to drop column "${h}"?`)) {
+          const dropped = CSVSanitizer.dropColumn(
+            lastProcessedData.headers,
+            lastProcessedData.rows,
+            cIdx,
+            (lastProcessedData.stats && lastProcessedData.stats.cellModifications) || {}
+          );
+          lastProcessedData.headers = dropped.headers;
+          lastProcessedData.rows = dropped.rows;
+          if (lastProcessedData.stats) {
+            lastProcessedData.stats.cellModifications = dropped.cellModifications;
+          }
+          statOutputRows.textContent = lastProcessedData.rows.length;
+          renderTable(lastProcessedData.headers, lastProcessedData.rows, filterInput.value);
+        }
+      });
+
+      inner.appendChild(titleSpan);
+      inner.appendChild(dropBtn);
+      th.appendChild(inner);
       trHead.appendChild(th);
     });
     tableHead.appendChild(trHead);
@@ -324,6 +370,7 @@ organic-tea-selection,"Morning "Sunrise" Herbal Tea Variety Pack (60 Bags)","<p>
           let tip = '';
           if (mod.type === 'repaired') tip = `Quote Repaired: "${mod.original}" → "${mod.fixed}"`;
           else if (mod.type === 'mojibake') tip = `Mojibake Fixed: "${mod.original}" → "${mod.fixed}"`;
+          else if (mod.type === 'date') tip = `Date Standardized: "${mod.original}" → "${mod.fixed}"`;
           else if (mod.type === 'masked') tip = `PII Anonymized: "${mod.original}" → "${mod.fixed}"`;
           else if (mod.type === 'zeros') tip = `Leading Zero Retained: "${mod.original}"`;
 

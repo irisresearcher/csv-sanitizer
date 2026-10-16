@@ -221,6 +221,31 @@ if (fs.existsSync(stressPath)) {
   assert(stressRes.stats.zerosPreservedCount >= 1000, `Stress: 1,000+ leading zeros preserved (got ${stressRes.stats.zerosPreservedCount})`);
 }
 
+// Test 14: ISO 8601 Date Standardization
+assert(CSVSanitizer.standardizeDate('01/15/2026') === '2026-01-15', 'Standardizes MM/DD/YYYY to YYYY-MM-DD');
+assert(CSVSanitizer.standardizeDate('15-01-2026') === '2026-01-15', 'Standardizes DD-MM-YYYY to YYYY-MM-DD');
+assert(CSVSanitizer.standardizeDate('Jan 15, 2026') === '2026-01-15', 'Standardizes "Jan 15, 2026" to YYYY-MM-DD');
+assert(CSVSanitizer.standardizeDate('15 January 2026') === '2026-01-15', 'Standardizes "15 January 2026" to YYYY-MM-DD');
+assert(CSVSanitizer.standardizeDate('2026/01/15 14:30:00') === '2026-01-15 14:30:00', 'Standardizes YYYY/MM/DD with timestamp');
+
+const dateCSV = 'id,tx_date\n1,01/15/2026\n2,15-01-2026\n3,Jan 18, 2026';
+const dateRes = CSVSanitizer.process(dateCSV, { standardizeDates: true });
+assert(dateRes.stats.datesStandardizedCount === 3, `Tracked date standardization count (got: ${dateRes.stats.datesStandardizedCount})`);
+assert(dateRes.rows[0][1] === '2026-01-15' && dateRes.rows[1][1] === '2026-01-15' && dateRes.rows[2][1] === '2026-01-18', 'End-to-end converts multiple date formats to clean ISO 8601');
+
+// Test 15: Drop Column Functionality & Coordinate Remapping
+const testHeaders = ['id', 'secret_ssn', 'name', 'email'];
+const testRows = [['1', '999-00-1111', 'Alice', 'a@a.com'], ['2', '888-00-2222', 'Bob', 'b@b.com']];
+const testMods = { '0:1': { type: 'masked' }, '0:3': { type: 'repaired' } };
+const dropRes = CSVSanitizer.dropColumn(testHeaders, testRows, 1, testMods);
+assert(dropRes.headers.length === 3 && !dropRes.headers.includes('secret_ssn'), 'dropColumn removes target header');
+assert(dropRes.rows[0].length === 3 && dropRes.rows[0][1] === 'Alice', 'dropColumn slices column from all data rows');
+assert(dropRes.cellModifications['0:2'] && dropRes.cellModifications['0:2'].type === 'repaired', 'dropColumn shifts cell diff coordinates correctly');
+
+// Test 16: Rename Column Functionality
+const renamedHeaders = CSVSanitizer.renameColumn(['sku', 'old_title', 'price'], 1, 'product_title');
+assert(renamedHeaders[1] === 'product_title' && renamedHeaders[0] === 'sku', 'renameColumn updates specified column header');
+
 console.log(`\n==========================================`);
 console.log(`Test Summary: ${passed} Passed, ${failed} Failed`);
 console.log(`==========================================\n`);

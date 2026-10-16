@@ -24,8 +24,11 @@
 
   // Auto-detect delimiter from sample lines
   function detectDelimiter(text) {
+    if (typeof text !== 'string') return ',';
+    let clean = text;
+    if (clean.charCodeAt(0) === 0xFEFF) clean = clean.slice(1);
     const delimiters = [',', ';', '\t', '|'];
-    const lines = text.split(/\r?\n/).filter(line => line.trim().length > 0).slice(0, 15);
+    const lines = clean.split(/\r?\n/).filter(line => line.trim().length > 0).slice(0, 15);
     
     if (lines.length === 0) return ',';
 
@@ -80,7 +83,7 @@
     [/Ã¶/g, "ö"], [/Ãµ/g, "õ"], [/Ãº/g, "ú"], [/Ã¹/g, "ù"], [/Ã»/g, "û"],
     [/Ã¼/g, "ü"], [/Ã½/g, "ý"], [/Ã¿/g, "ÿ"], [/Ã‰/g, "É"], [/Ãˆ/g, "È"],
     [/Ã€/g, "À"], [/Ã/g, "Á"], [/Ã‘/g, "Ñ"], [/Ã“/g, "Ó"], [/Ã–/g, "Ö"],
-    [/Ãœ/g, "Ü"], [/â‚¬/g, "€"], [/â„¢/g, "™"], [/Â©/g, "©"], [/Â®/g, "®"],
+    [/Ãœ/g, "Ü"], [/â‚¬/g, "€"], [/Â£/g, "£"], [/Â¥/g, "¥"], [/Â§/g, "§"], [/â„¢/g, "™"], [/Â©/g, "©"], [/Â®/g, "®"],
     [/Â°/g, "°"], [/Â±/g, "±"]
   ];
 
@@ -145,60 +148,164 @@
     return repaired.join('');
   }
 
+  // Helper to detect if a quote before a delimiter was actually an internal quote in a phrase
+  function isPseudoClosingQuote(src, i, delimiter) {
+    let k = i + 1;
+    while (k < src.length && (src[k] === ' ' || (src[k] === '\t' && delimiter !== '\t'))) k++;
+    if (k >= src.length || src[k] !== delimiter) return false;
+    
+    // Find where the next token ends
+    let nextStart = k + 1;
+    let d = src.indexOf(delimiter, nextStart);
+    let nl = src.indexOf('\n', nextStart);
+    let endOfNext = (d !== -1 && (nl === -1 || d < nl)) ? d : (nl !== -1 ? nl : src.length);
+    let nextToken = src.slice(nextStart, endOfNext).trim();
+    
+    // If the next token ends with a quote but doesn't start with a quote,
+    // then the current quote was an internal quote and NOT the field closing quote!
+    if (nextToken.endsWith('"') && !nextToken.startsWith('"')) {
+      return true;
+    }
+    return false;
+  }
+
   // Tokenize and parse a sanitized CSV string into a 2D array
   function parseCSV(text, delimiter, fixQuotes = true) {
+    if (typeof text !== 'string') return { rows: [], repairedLinesCount: 0, repairedRowIndices: new Set() };
+
+    let src = text;
+    if (src.charCodeAt(0) === 0xFEFF) {
+      src = src.slice(1);
+    }
+
     const rows = [];
     let currentRow = [];
     let currentCell = '';
     let inQuotes = false;
-    let repairedLinesCount = 0;
+    let cellStart = true;
+    let repairedCount = 0;
     const repairedRowIndices = new Set();
+    let currentRowIdx = 0;
 
-    let source = text;
-    if (fixQuotes) {
-      const rawLines = text.split(/\r?\n/);
-      const repairedLines = rawLines.map((line, idx) => {
-        const rep = repairUnescapedQuotes(line, delimiter);
-        if (rep !== line) {
-          repairedLinesCount++;
-          repairedRowIndices.add(idx);
+    for (let i = 0; i < src.length; i++) {
+      const c = src[i];
+      const next = i < src.length - 1 ? src[i + 1] : null;
+
+      // CRLF or LF line breaks outside quotes -> end of record
+      if ((c === '\r' || c === '\n') && !inQuotes) {
+        if (c === '\r' && next === '\n') {
+          i++; // skip \n in CRLF
         }
-        return rep;
-      });
-      source = repairedLines.join('\n');
-    }
-
-    for (let i = 0; i < source.length; i++) {
-      const c = source[i];
-      const next = source[i + 1];
-
-      if (c === '"') {
-        if (inQuotes && next === '"') {
-          currentCell += '"';
-          i++; // skip escaped quote
-        } else {
-          inQuotes = !inQuotes;
-        }
-      } else if (c === delimiter && !inQuotes) {
-        currentRow.push(currentCell);
-        currentCell = '';
-      } else if ((c === '\r' || c === '\n') && !inQuotes) {
-        if (c === '\r' && next === '\n') i++;
         currentRow.push(currentCell);
         rows.push(currentRow);
+        currentRowIdx++;
         currentRow = [];
         currentCell = '';
-      } else {
-        currentCell += c;
+        cellStart = true;
+        continue;
+      }
+
+      // Delimiter outside quotes -> end of field
+      if (c === delimiter && !inQuotes) {
+        currentRow.push(currentCell);
+        currentCell = '';
+        cellStart = true;
+        continue;
+      }
+
+      // Backslash-escaped quote \" in JSON or database dumps
+      if (fixQuotes && c === '\\' && next === '"') {
+        currentCell += '"';
+        i++; // skip quote
+        repairedCount++;
+        repairedRowIndices.add(currentRowIdx);
+        cellStart = false;
+        continue;
+      }
+
+      // Quote handling
+      if (c === '"') {
+        if (!inQuotes) {
+          if (cellStart && currentCell.trim().length === 0) {
+            inQuotes = true;
+            cellStart = false;
+            continue;
+          } else {
+            // Unescaped quote inside unquoted field (e.g. 24" Monitor)
+            if (fixQuotes) {
+              currentCell += '"';
+              repairedCount++;
+              repairedRowIndices.add(currentRowIdx);
+              continue;
+            } else {
+              inQuotes = true;
+              continue;
+            }
+          }
+        } else {
+          // In quotes: check RFC 4180 escaped quote ""
+          if (next === '"') {
+            currentCell += '"';
+            i++; // skip next quote
+            continue;
+          }
+
+          // Check if this quote is a true field closing quote
+          let k = i + 1;
+          while (k < src.length && (src[k] === ' ' || (src[k] === '\t' && delimiter !== '\t'))) {
+            k++;
+          }
+
+          const isDelimiterOrNewline = (
+            k === src.length ||
+            src[k] === delimiter ||
+            src[k] === '\r' ||
+            src[k] === '\n'
+          );
+
+          let isClosing = isDelimiterOrNewline;
+          if (isClosing && fixQuotes && src[k] === delimiter) {
+            if (isPseudoClosingQuote(src, i, delimiter)) {
+              isClosing = false;
+            }
+          }
+
+          if (isClosing) {
+            inQuotes = false;
+            i = k - 1;
+            continue;
+          } else {
+            // Internal unescaped quote inside quoted field
+            if (fixQuotes) {
+              currentCell += '"';
+              repairedCount++;
+              repairedRowIndices.add(currentRowIdx);
+              continue;
+            } else {
+              inQuotes = false;
+              continue;
+            }
+          }
+        }
+      }
+
+      // Regular character
+      currentCell += c;
+      if (cellStart && (c !== ' ' && (c !== '\t' || delimiter === '\t'))) {
+        cellStart = false;
       }
     }
 
-    if (currentCell.length > 0 || currentRow.length > 0) {
+    if (currentCell.length > 0 || currentRow.length > 0 || inQuotes) {
+      if (inQuotes && fixQuotes) {
+        repairedCount++;
+        repairedRowIndices.add(currentRowIdx);
+      }
       currentRow.push(currentCell);
       rows.push(currentRow);
     }
 
-    return { rows, repairedLinesCount, repairedRowIndices };
+    return { rows, repairedLinesCount: repairedCount, repairedRowIndices };
   }
 
   // PII Masking Utilities
@@ -228,6 +335,11 @@
   function process(rawText, options = {}) {
     const startTime = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
 
+    let cleanInput = (typeof rawText === 'string') ? rawText : String(rawText || '');
+    if (cleanInput.charCodeAt(0) === 0xFEFF) {
+      cleanInput = cleanInput.slice(1);
+    }
+
     const opts = {
       delimiter: options.delimiter || 'auto',
       fixQuotes: options.fixQuotes !== false,
@@ -242,18 +354,18 @@
       maskCreditCard: !!options.maskCreditCard
     };
 
-    const effectiveDelimiter = (opts.delimiter === 'auto') ? detectDelimiter(rawText) : opts.delimiter;
+    const effectiveDelimiter = (opts.delimiter === 'auto') ? detectDelimiter(cleanInput) : opts.delimiter;
     
     // Parse raw rows without quote repair to provide baseline for cell diffing
     let baselineRows = [];
     try {
-      const rawRes = parseCSV(rawText, effectiveDelimiter, false);
+      const rawRes = parseCSV(cleanInput, effectiveDelimiter, false);
       baselineRows = rawRes.rows;
     } catch (_) {
       baselineRows = [];
     }
 
-    const { rows: rawRows, repairedLinesCount, repairedRowIndices } = parseCSV(rawText, effectiveDelimiter, opts.fixQuotes);
+    const { rows: rawRows, repairedLinesCount, repairedRowIndices } = parseCSV(cleanInput, effectiveDelimiter, opts.fixQuotes);
 
     let cleanRows = [];
     let emptyRowsRemoved = 0;

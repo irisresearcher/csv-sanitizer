@@ -141,6 +141,78 @@ if (fs.existsSync(finPath)) {
   assert(finRes.stats.zerosPreservedCount >= 5, `Finance: Bank account leading zeros preserved (${finRes.stats.zerosPreservedCount})`);
 }
 
+// Test 12: Real-World Multiline & Complex Quoting Edge Cases
+const edgeCases = [
+  {
+    name: 'BOM Header Strip',
+    input: '\uFEFFid,name,role\n1,Alice,Admin\n2,Bob,User',
+    check: (res) => res.headers[0] === 'id' && res.rows.length === 2
+  },
+  {
+    name: 'Multiline quoted field with newlines inside quotes',
+    input: 'id,title,description\n1,"Item 1","Line 1\nLine 2\nLine 3"\n2,"Item 2","Single line"',
+    check: (res) => res.rows.length === 2 && res.rows[0][2] === 'Line 1\nLine 2\nLine 3'
+  },
+  {
+    name: 'Multiline quoted field with embedded unescaped quotes inside',
+    input: 'id,description,status\n101,"Line 1 with 24" monitor\nLine 2 with "Pro" features",active\n102,"Normal",done',
+    check: (res) => res.rows.length === 2 && res.rows[0][1].includes('24" monitor')
+  },
+  {
+    name: 'Backslash-escaped quotes (MySQL/JSON export: \\")',
+    input: 'id,payload\n1,"{\\"name\\": \\"Widget\\", \\"size\\": \\"Large\\"}"\n2,"{\\"name\\": \\"Gadget\\"}"',
+    check: (res) => res.rows.length === 2 && res.rows[0][1].includes('"name": "Widget"')
+  },
+  {
+    name: 'Semicolon delimiter with commas inside text',
+    input: 'ID;Full Name;Location\n1;Doe, John;New York, NY\n2;Smith, Jane;London, UK',
+    check: (res) => res.stats.delimiter === ';' && res.rows[0][1] === 'Doe, John'
+  },
+  {
+    name: 'Tab delimited with quotes and spaces',
+    input: 'sku\tname\tprice\n00123\t"Widget 12\\""\t19.99\n00456\tGadget\t29.99',
+    check: (res) => res.stats.delimiter === '\t' && res.rows.length === 2 && res.rows[0][1] === 'Widget 12"'
+  },
+  {
+    name: 'Trailing empty lines and Windows CRLF',
+    input: "id,val\r\n1,one\r\n2,two\r\n\r\n\r\n",
+    check: (res) => res.rows.length === 2
+  },
+  {
+    name: 'Leading and trailing spaces around quoted fields',
+    input: 'id, title , price \n 1 , " 24\\" Gaming Monitor " , 299.99 ',
+    check: (res) => res.headers[1] === 'title' && res.rows[0][0] === '1'
+  }
+];
+
+for (const ec of edgeCases) {
+  const ecRes = CSVSanitizer.process(ec.input, { fixQuotes: true, trimWhitespace: true, removeEmptyRows: true });
+  assert(ec.check(ecRes), `Edge Case: ${ec.name}`);
+}
+
+// Test 13: 1,000-Row Real-World Stress Test Dataset
+const stressPath = path.join(__dirname, '../test_data/stress_test_1000_rows.csv');
+if (fs.existsSync(stressPath)) {
+  const stressRaw = fs.readFileSync(stressPath, 'utf8');
+  const stressRes = CSVSanitizer.process(stressRaw, {
+    delimiter: 'auto',
+    fixQuotes: true,
+    fixMojibake: true,
+    trimWhitespace: true,
+    deduplicate: true,
+    removeEmptyRows: true,
+    preserveLeadingZeros: true,
+    maskEmail: true,
+    maskPhone: true,
+    maskCreditCard: true
+  });
+  assert(stressRes.rows.length === 1000, `Stress: exactly 1000 clean data rows parsed (got ${stressRes.rows.length})`);
+  assert(stressRes.stats.duplicatesRemoved === 2, `Stress: exactly 2 duplicate rows removed (got ${stressRes.stats.duplicatesRemoved})`);
+  assert(stressRes.stats.emptyRowsRemoved === 2, `Stress: exactly 2 empty rows filtered (got ${stressRes.stats.emptyRowsRemoved})`);
+  assert(stressRes.stats.piiMaskedCount >= 3000, `Stress: 3,000+ PII tokens masked (got ${stressRes.stats.piiMaskedCount})`);
+  assert(stressRes.stats.zerosPreservedCount >= 1000, `Stress: 1,000+ leading zeros preserved (got ${stressRes.stats.zerosPreservedCount})`);
+}
+
 console.log(`\n==========================================`);
 console.log(`Test Summary: ${passed} Passed, ${failed} Failed`);
 console.log(`==========================================\n`);
